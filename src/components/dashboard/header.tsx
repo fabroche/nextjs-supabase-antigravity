@@ -1,0 +1,74 @@
+"use client"
+
+import { Bell, Search, User } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { MobileSidebar } from "./sidebar"
+
+export function Header() {
+  return (
+    <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
+      <MobileSidebar />
+      
+      <div className="flex-1 flex items-center gap-4">
+        <form className="flex-1 max-w-md">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search..."
+              className="pl-8 w-full"
+            />
+          </div>
+        </form>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="relative">
+          <Bell className="h-5 w-5" />
+          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+        </Button>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+              <Avatar className="h-9 w-9">
+                <AvatarImage src="/avatar.png" alt="User" />
+                <AvatarFallback>U</AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium">Usuario</p>
+                <p className="text-xs text-muted-foreground">
+                  usuario@ejemplo.com
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <User className="mr-2 h-4 w-4" />
+              Perfil
+            </DropdownMenuItem>
+            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive">
+              Cerrar sesión
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </header>
+  )
+}
