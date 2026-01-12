@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, Search, User } from "lucide-react"
+import { Bell, Search, User, LogOut } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,8 +14,26 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MobileSidebar } from "./sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { signOut } from "@/lib/auth/actions"
+import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 
 export function Header() {
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadUser() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserEmail(user?.email || null)
+    }
+    loadUser()
+  }, [])
+
+  async function handleSignOut() {
+    await signOut()
+  }
+
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       <MobileSidebar />
@@ -46,16 +64,18 @@ export function Header() {
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
                 <AvatarImage src="/avatar.png" alt="User" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarFallback>
+                  {userEmail ? userEmail[0].toUpperCase() : "U"}
+                </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">Usuario</p>
+                <p className="text-sm font-medium">Mi Cuenta</p>
                 <p className="text-xs text-muted-foreground">
-                  usuario@ejemplo.com
+                  {userEmail || "usuario@ejemplo.com"}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -66,7 +86,11 @@ export function Header() {
             </DropdownMenuItem>
             <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem 
+              className="text-destructive"
+              onClick={handleSignOut}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
               Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>

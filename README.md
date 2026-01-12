@@ -15,7 +15,9 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 - 🎨 **Modern UI** - Built with shadcn/ui components and Tailwind CSS v4
 - 📱 **Responsive Design** - Optimized for desktop, tablet, and mobile
 - 🌓 **Dark Mode** - Automatic theme switching support
-- 🔐 **Supabase Integration** - Backend ready for authentication and data management
+- 🔐 **Authentication** - Secure login/register with Supabase Auth
+- 🛡️ **Protected Routes** - Middleware-based route protection
+- 👤 **User Management** - Session handling and user profiles
 - ⚡ **Fast & Optimized** - Server-side rendering with Next.js 16
 - 🎯 **TypeScript** - Full type safety throughout the application
 
@@ -31,6 +33,52 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 - **Overview Chart** - Visual representation of monthly data
 - **Recent Activity Table** - Latest transactions and user activity
 - **Tab Navigation** - Organized sections (Overview, Analytics, Reports)
+
+---
+
+## 🔐 Authentication
+
+The application includes a complete authentication system powered by Supabase Auth.
+
+### Features
+
+- ✅ **Email/Password Login** - Secure authentication with Supabase
+- ✅ **User Registration** - New user sign-up with email verification
+- ✅ **Session Management** - Persistent sessions with HTTP-only cookies
+- ✅ **Protected Routes** - Automatic redirect for unauthenticated users
+- ✅ **User Menu** - Profile dropdown with logout functionality
+- ✅ **Password Reset** - "Forgot password" link (requires Supabase configuration)
+
+### Using Authentication
+
+**Login Page**: Navigate to `/login` to access the authentication page
+
+**Test Credentials** (if you have a test user):
+
+```
+Email: your-email@example.com
+Password: your-password
+```
+
+**Logout**: Click on your avatar in the top-right corner and select "Cerrar sesión"
+
+### Authentication Flow
+
+1. **Unauthenticated users** are automatically redirected to `/login`
+2. **After login**, users are redirected to the dashboard (`/`)
+3. **Session persists** across page refreshes
+4. **Logout** clears the session and redirects to `/login`
+
+### Supabase Auth Setup
+
+To enable authentication in your Supabase project:
+
+1. Go to **Authentication** → **Providers** in your Supabase dashboard
+2. Enable **Email** provider
+3. Configure email templates (optional)
+4. Set up SMTP for production email delivery (optional)
+
+> **Note**: Users can register and login even without email verification. You can enforce email verification in Supabase settings if needed.
 
 ---
 
@@ -98,6 +146,8 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 nextjs-supabase/
 ├── src/
 │   ├── app/                    # Next.js App Router
+│   │   ├── login/             # Authentication pages
+│   │   │   └── page.tsx       # Login/Register page
 │   │   ├── layout.tsx         # Root layout
 │   │   ├── page.tsx           # Dashboard home
 │   │   └── globals.css        # Global styles + theme
@@ -110,9 +160,17 @@ nextjs-supabase/
 │   │   │   └── recent-activity.tsx
 │   │   └── ui/                # shadcn/ui components
 │   ├── lib/
+│   │   ├── auth/              # Authentication utilities
+│   │   │   └── actions.ts     # Server actions for auth
 │   │   ├── supabase/          # Supabase clients
+│   │   │   ├── client.ts      # Client-side client
+│   │   │   ├── server.ts      # Server-side client
+│   │   │   └── middleware.ts  # Session management
 │   │   └── utils.ts           # Utility functions
-│   └── middleware.ts          # Next.js middleware
+│   └── middleware.ts          # Route protection
+├── public/
+│   └── assets/
+│       └── login-cover.png    # Login page image
 ├── components.json            # shadcn/ui config
 ├── claude.md                  # Project memory & context
 └── README.md                  # This file
