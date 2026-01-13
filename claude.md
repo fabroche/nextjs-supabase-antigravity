@@ -3,9 +3,9 @@
 ## Project Overview
 
 **Project Name**: Next.js Supabase Dashboard  
-**Purpose**: Metrics dashboard application with authentication for monitoring project analytics  
+**Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: Dashboard and authentication implementation complete
+**Development Status**: Dashboard, OTP authentication, role-based business access, and client-side auth complete
 
 ---
 
@@ -92,21 +92,26 @@ When adding a new feature (e.g., User Authentication):
 nextjs-supabase/
 ├── src/
 │   ├── app/
+│   │   ├── auth/
+│   │   │   └── callback/
+│   │   │       └── route.ts      # OAuth callback handler
 │   │   ├── login/
-│   │   │   └── page.tsx        # Login/Register page
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Dashboard home page
-│   │   └── globals.css         # Global styles + shadcn theme
+│   │   │   └── page.tsx          # Login/Register page
+│   │   ├── verify-email/
+│   │   │   └── page.tsx          # OTP verification page
+│   │   ├── layout.tsx            # Root layout with providers
+│   │   ├── page.tsx              # Dashboard home page
+│   │   └── globals.css           # Global styles + shadcn theme
 │   ├── components/
-│   │   ├── dashboard/          # Dashboard-specific components
-│   │   │   ├── sidebar.tsx     # Navigation sidebar (collapsible)
-│   │   │   ├── header.tsx      # Top bar with search & user menu
-│   │   │   ├── metric-card.tsx # Reusable metric display
-│   │   │   ├── overview-chart.tsx # Chart visualization
+│   │   ├── dashboard/            # Dashboard-specific components
+│   │   │   ├── sidebar.tsx       # Navigation sidebar (collapsible)
+│   │   │   ├── header.tsx        # Top bar with business selector
+│   │   │   ├── metric-card.tsx   # Reusable metric display
+│   │   │   ├── overview-chart.tsx # Animated chart visualization
 │   │   │   └── recent-activity.tsx # Activity table
-│   │   ├── theme-provider.tsx  # Theme context provider
-│   │   ├── theme-toggle.tsx    # Dark mode toggle
-│   │   └── ui/                 # shadcn/ui components
+│   │   ├── theme-provider.tsx    # Theme context provider
+│   │   ├── theme-toggle.tsx      # Dark mode toggle
+│   │   └── ui/                   # shadcn/ui components
 │   │       ├── avatar.tsx
 │   │       ├── badge.tsx
 │   │       ├── button.tsx
@@ -114,27 +119,34 @@ nextjs-supabase/
 │   │       ├── dropdown-menu.tsx
 │   │       ├── form.tsx
 │   │       ├── input.tsx
+│   │       ├── input-otp.tsx     # OTP input component
 │   │       ├── label.tsx
+│   │       ├── select.tsx        # Business selector
 │   │       ├── separator.tsx
 │   │       ├── sheet.tsx
 │   │       ├── table.tsx
 │   │       └── tabs.tsx
+│   ├── contexts/
+│   │   ├── auth-context.tsx    # Centralized authentication state
+│   │   └── business-context.tsx  # Business state management
 │   ├── lib/
 │   │   ├── auth/
-│   │   │   └── actions.ts      # Server actions for authentication
+│   │   │   └── actions.ts        # Server actions for authentication
+│   │   ├── data/
+│   │   │   └── mock-businesses.ts # Mock business data
 │   │   ├── supabase/
-│   │   │   ├── client.ts       # Client-side Supabase client
-│   │   │   ├── server.ts       # Server-side Supabase client
-│   │   │   └── middleware.ts   # Session management
-│   │   └── utils.ts            # cn() utility for class merging
-│   └── middleware.ts           # Route protection middleware
+│   │   │   ├── client.ts         # Client-side Supabase client
+│   │   │   ├── server.ts         # Server-side Supabase client
+│   │   │   └── middleware.ts     # Session management
+│   │   └── utils.ts              # cn() utility for class merging
+│   └── middleware.ts             # Route protection middleware
 ├── public/
 │   └── assets/
-│       └── login-cover.png     # Login page cover image
-├── components.json             # shadcn/ui configuration
-├── tsconfig.json              # TypeScript configuration
-├── .env.local                 # Environment variables (gitignored)
-└── package.json               # Dependencies
+│       └── login-cover.png       # Login page cover image
+├── components.json               # shadcn/ui configuration
+├── tsconfig.json                 # TypeScript configuration
+├── .env.local                    # Environment variables (gitignored)
+└── package.json                  # Dependencies
 ```
 
 ---
@@ -185,6 +197,7 @@ Required in `.env.local`:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_ADMIN_EMAIL=admin@example.com
 ```
 
 **Current Setup**: Self-hosted Supabase instance at `https://supabase.genzai.cloud`
@@ -247,6 +260,14 @@ Features:
 
 #### 6. Authentication System
 
+**OTP Email Verification** (`app/verify-email/page.tsx`):
+
+- 6-digit OTP input using shadcn input-otp component
+- Automatic verification when code is complete
+- Resend code functionality
+- Success state with auto-redirect to login
+- Error handling for invalid codes
+
 **Login/Register Page** (`app/login/page.tsx`):
 
 - Dual-mode form (toggle between login and sign-up)
@@ -255,17 +276,24 @@ Features:
 - Loading states during authentication
 - Split-screen design with analytics cover image
 - "Forgot password" link
+- Success message display after email verification
+
+**Auth Callback Handler** (`app/auth/callback/route.ts`):
+
+- Handles OAuth callbacks (if needed in future)
+- Currently used for email link verification fallback
 
 **Server Actions** (`lib/auth/actions.ts`):
 
 - `signIn(formData)` - Email/password authentication
-- `signUp(formData)` - User registration
+- `signUp(formData)` - User registration with OTP
 - `signOut()` - Session termination
 - `getUser()` - Current user retrieval
 
 **Protected Routes** (`middleware.ts` + `lib/supabase/middleware.ts`):
 
 - Redirects unauthenticated users to `/login`
+- Allows access to `/verify-email` and `/auth/callback` without auth
 - Prevents logged-in users from accessing `/login`
 - Maintains session cookies across requests
 - Protects all routes except static assets
@@ -281,17 +309,66 @@ Features:
 
 1. User visits protected route → Middleware checks session
 2. If not authenticated → Redirect to `/login`
-3. User submits credentials → Server action validates
-4. If valid → Create session → Redirect to dashboard
-5. Session persists across page refreshes
-6. Logout → Clear session → Redirect to `/login`
+3. New user registers → Supabase sends OTP code via email
+4. User redirected to `/verify-email` page
+5. User enters 6-digit OTP → System verifies with Supabase
+6. If valid → Email verified → Redirect to login with success message
+7. User logs in → Create session → Redirect to dashboard
+8. Session persists across page refreshes
+9. Logout → Clear session → Redirect to `/login`
 
 **Security Features**:
 
 - Server-side authentication
 - HTTP-only cookies for session management
+- OTP codes expire after 60 minutes
 - Password hashing by Supabase
 - CSRF protection via Next.js
+
+#### 7. Business Context System
+
+**Business Context** (`contexts/business-context.tsx`):
+
+- React Context for sharing selected business across components
+- Provides `selectedBusiness`, `setSelectedBusiness`, and `businesses` array
+- Wraps entire app in `layout.tsx`
+
+**Mock Business Data** (`lib/data/mock-businesses.ts`):
+
+- Three sample businesses with complete metrics:
+  - Tech Solutions Inc.
+  - E-Commerce Pro
+  - Marketing Agency
+- Each business includes:
+  - Unique metrics (revenue, users, sales, active now)
+  - 6 months of chart data with varied values
+  - 5 recent activity transactions
+  - Status indicators (success, pending, failed)
+
+**Business Selector** (in `header.tsx`):
+
+- Select dropdown before theme toggle
+- Displays all available businesses
+- Updates context when selection changes
+- Triggers automatic dashboard updates
+
+**Dynamic Dashboard Updates**:
+
+- Metric cards update with selected business data
+- Chart animates smoothly between business data (500ms transition)
+- Recent activity table shows business-specific transactions
+- All changes happen instantly when business is selected
+
+#### 8. Animated Chart Component
+
+**Overview Chart** (`components/dashboard/overview-chart.tsx`):
+
+- Pixel-based height calculations for proper CSS transitions
+- 500ms smooth animation when data changes
+- Responsive bar chart with 6 months of data
+- Hover effects on bars
+- Dynamic scaling based on max value
+- Ready for Recharts integration
 
 ---
 
@@ -424,11 +501,28 @@ npx shadcn@latest add select
 ### Completed Features
 
 - ✅ **Authentication** (Completed)
+
   - Supabase Auth integration
   - Protected routes with middleware
   - User session management
   - Login/Register page
   - User menu with logout
+
+- ✅ **OTP Email Verification** (Completed)
+
+  - 6-digit OTP input component
+  - Email verification flow
+  - Resend code functionality
+  - Success/error states
+  - Auto-redirect after verification
+
+- ✅ **Business Selector** (Completed)
+  - Business context provider
+  - Mock business data (3 businesses)
+  - Select dropdown in header
+  - Dynamic metric updates
+  - Animated chart transitions
+  - Per-business activity data
 
 ---
 
@@ -581,6 +675,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-01-12_  
-_Version: 0.2.0_  
-_Status: Dashboard + Authentication Implementation Complete_
+_Last Updated: 2026-01-13_  
+_Version: 0.3.0_  
+_Status: Dashboard + OTP Authentication + Business Selector Complete_

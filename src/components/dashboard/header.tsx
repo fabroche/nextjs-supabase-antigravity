@@ -11,27 +11,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MobileSidebar } from "./sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { signOut } from "@/lib/auth/actions"
-import { useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useBusiness } from "@/contexts/business-context"
+import { useAuth } from "@/contexts/auth-context"
 
 export function Header() {
-  const [userEmail, setUserEmail] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function loadUser() {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      setUserEmail(user?.email || null)
-    }
-    loadUser()
-  }, [])
+  const { user } = useAuth()
+  const { selectedBusiness, setSelectedBusiness, businesses, isAdmin, isLoading } = useBusiness()
 
   async function handleSignOut() {
     await signOut()
+  }
+
+  function handleBusinessChange(businessId: string) {
+    const business = businesses.find(b => b.id === businessId)
+    if (business) {
+      setSelectedBusiness(business)
+    }
   }
 
   return (
@@ -52,6 +58,22 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Business Selector - Only visible for admin users */}
+        {!isLoading && isAdmin && selectedBusiness && (
+          <Select value={selectedBusiness.id} onValueChange={handleBusinessChange}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {businesses.map((business) => (
+                <SelectItem key={business.id} value={business.id}>
+                  {business.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
         <ThemeToggle />
         
         <Button variant="ghost" size="icon" className="relative">
@@ -65,7 +87,7 @@ export function Header() {
               <Avatar className="h-9 w-9">
                 <AvatarImage src="/avatar.png" alt="User" />
                 <AvatarFallback>
-                  {userEmail ? userEmail[0].toUpperCase() : "U"}
+                  {user?.email ? user.email[0].toUpperCase() : "U"}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -75,7 +97,7 @@ export function Header() {
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">Mi Cuenta</p>
                 <p className="text-xs text-muted-foreground">
-                  {userEmail || "usuario@ejemplo.com"}
+                  {user?.email || "usuario@ejemplo.com"}
                 </p>
               </div>
             </DropdownMenuLabel>

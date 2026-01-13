@@ -15,39 +15,62 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 - 🎨 **Modern UI** - Built with shadcn/ui components and Tailwind CSS v4
 - 📱 **Responsive Design** - Optimized for desktop, tablet, and mobile
 - 🌓 **Dark Mode** - Automatic theme switching support
-- 🔐 **Authentication** - Secure login/register with Supabase Auth
+- 🔐 **Client-Side Authentication** - Secure login/register with real-time session sync
+- ✉️ **OTP Email Verification** - 6-digit code verification for new users
+- 👥 **Role-Based Access** - Admin and regular user roles with different permissions
+- 🏢 **Multi-Business Support** - Admin users can switch between businesses
+- 🔄 **Real-Time Updates** - Dashboard updates instantly without page refresh
 - 🛡️ **Protected Routes** - Middleware-based route protection
-- 👤 **User Management** - Session handling and user profiles
+- 👤 **User Management** - Centralized auth state with AuthContext
 - ⚡ **Fast & Optimized** - Server-side rendering with Next.js 16
 - 🎯 **TypeScript** - Full type safety throughout the application
 
 ### Current Dashboard Components
 
+- **Business Selector** - Dropdown to switch between different businesses
 - **Collapsible Sidebar** - Easy navigation with icon-only collapsed state
 - **Search & Notifications** - Quick access to search and notification center
-- **Metric Cards** - Display key metrics with trend indicators
+- **Metric Cards** - Display key metrics with trend indicators (dynamic per business)
   - Total Revenue
   - Active Users
   - Sales
   - Active Now
-- **Overview Chart** - Visual representation of monthly data
-- **Recent Activity Table** - Latest transactions and user activity
+- **Animated Overview Chart** - Visual representation of monthly data with smooth transitions
+- **Recent Activity Table** - Latest transactions and user activity (per business)
 - **Tab Navigation** - Organized sections (Overview, Analytics, Reports)
+- **Theme Toggle** - Switch between light and dark modes
 
 ---
 
 ## 🔐 Authentication
 
-The application includes a complete authentication system powered by Supabase Auth.
+The application uses a **client-side authentication** approach with centralized state management.
 
 ### Features
 
-- ✅ **Email/Password Login** - Secure authentication with Supabase
-- ✅ **User Registration** - New user sign-up with email verification
-- ✅ **Session Management** - Persistent sessions with HTTP-only cookies
+- ✅ **Client-Side Auth** - Direct Supabase client calls for instant session sync
+- ✅ **AuthContext** - Centralized authentication state management
+- ✅ **Email/Password Login** - Secure authentication with real-time updates
+- ✅ **User Registration** - New user sign-up with OTP email verification
+- ✅ **OTP Verification** - 6-digit code sent via email using shadcn input-otp component
+- ✅ **Session Management** - Persistent sessions with automatic state sync
 - ✅ **Protected Routes** - Automatic redirect for unauthenticated users
 - ✅ **User Menu** - Profile dropdown with logout functionality
 - ✅ **Password Reset** - "Forgot password" link (requires Supabase configuration)
+
+### Architecture
+
+**AuthContext** (`src/contexts/auth-context.tsx`):
+
+- Listens to Supabase `onAuthStateChange` events
+- Provides `user` and `isLoading` state to entire app
+- Single source of truth for authentication state
+
+**BusinessContext** (`src/contexts/business-context.tsx`):
+
+- Consumes AuthContext for user information
+- Manages business selection and role-based access
+- Automatically updates when user changes
 
 ### Using Authentication
 
@@ -65,9 +88,27 @@ Password: your-password
 ### Authentication Flow
 
 1. **Unauthenticated users** are automatically redirected to `/login`
-2. **After login**, users are redirected to the dashboard (`/`)
-3. **Session persists** across page refreshes
-4. **Logout** clears the session and redirects to `/login`
+2. **New users register** → Receive 6-digit OTP code via email
+3. **User enters OTP** on `/verify-email` page → Email verified
+4. **After verification**, users can log in
+5. **Login** → Client-side auth → `onAuthStateChange` fires → AuthContext updates
+6. **Dashboard loads** → BusinessContext reads user → Determines role and business
+7. **Session persists** across page refreshes with automatic sync
+8. **Logout** clears the session and redirects to `/login`
+
+### Role-Based Access
+
+**Admin Users** (configured via `NEXT_PUBLIC_ADMIN_EMAIL`):
+
+- Can see business selector in header
+- Can switch between all businesses
+- View metrics for any business
+
+**Regular Users**:
+
+- No business selector visible
+- See only their associated business
+- Business determined by `ownerEmail` in mock data
 
 ### Supabase Auth Setup
 
@@ -122,6 +163,7 @@ To enable authentication in your Supabase project:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   NEXT_PUBLIC_ADMIN_EMAIL=admin@example.com
    ```
 
    > 💡 **Finding your Supabase credentials:**
@@ -146,22 +188,29 @@ To enable authentication in your Supabase project:
 nextjs-supabase/
 ├── src/
 │   ├── app/                    # Next.js App Router
+│   │   ├── auth/callback/     # OAuth callback handler
 │   │   ├── login/             # Authentication pages
-│   │   │   └── page.tsx       # Login/Register page
-│   │   ├── layout.tsx         # Root layout
+│   │   │   └── page.tsx       # Login/Register page (client-side)
+│   │   ├── verify-email/      # OTP verification
+│   │   ├── layout.tsx         # Root layout with providers
 │   │   ├── page.tsx           # Dashboard home
 │   │   └── globals.css        # Global styles + theme
 │   ├── components/
 │   │   ├── dashboard/         # Dashboard components
 │   │   │   ├── sidebar.tsx
-│   │   │   ├── header.tsx
+│   │   │   ├── header.tsx     # With business selector
 │   │   │   ├── metric-card.tsx
-│   │   │   ├── overview-chart.tsx
+│   │   │   ├── overview-chart.tsx  # Animated chart
 │   │   │   └── recent-activity.tsx
 │   │   └── ui/                # shadcn/ui components
+│   ├── contexts/              # React contexts
+│   │   ├── auth-context.tsx   # Authentication state
+│   │   └── business-context.tsx  # Business selection
 │   ├── lib/
 │   │   ├── auth/              # Authentication utilities
-│   │   │   └── actions.ts     # Server actions for auth
+│   │   │   └── actions.ts     # Server actions (logout)
+│   │   ├── data/              # Mock data
+│   │   │   └── mock-businesses.ts  # Business data
 │   │   ├── supabase/          # Supabase clients
 │   │   │   ├── client.ts      # Client-side client
 │   │   │   ├── server.ts      # Server-side client

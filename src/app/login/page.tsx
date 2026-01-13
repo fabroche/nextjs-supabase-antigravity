@@ -3,13 +3,14 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { signIn, signUp } from "@/lib/auth/actions"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const verified = searchParams.get("verified")
   
@@ -17,19 +18,71 @@ export default function LoginPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [isSignUp, setIsSignUp] = React.useState(false)
 
+  // Helper function for button text
+  function getButtonText() {
+    if (isLoading) return "Loading..."
+    return isSignUp ? "Sign up" : "Login"
+  }
+
+  // Basic form validation
+  function validateForm(email: string, password: string): string | null {
+    if (!email || !email.includes("@")) {
+      return "Please enter a valid email address"
+    }
+    if (!password || password.length < 6) {
+      return "Password must be at least 6 characters"
+    }
+    return null
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setIsLoading(true)
     setError(null)
 
     const formData = new FormData(event.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    // Validate form
+    const validationError = validateForm(email, password)
+    if (validationError) {
+      setError(validationError)
+      setIsLoading(false)
+      return
+    }
+
+    const supabase = createClient()
 
     try {
-      const result = isSignUp ? await signUp(formData) : await signIn(formData)
-      
-      if (result?.error) {
-        setError(result.error)
-        setIsLoading(false)
+      if (isSignUp) {
+        // Sign up
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        })
+
+        if (error) {
+          setError(error.message)
+          setIsLoading(false)
+        } else {
+          // Redirect to verify email page
+          router.push(`/verify-email?email=${encodeURIComponent(email)}`)
+        }
+      } else {
+        // Sign in
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (error) {
+          setError(error.message)
+          setIsLoading(false)
+        } else {
+          // Client-side navigation - contexts stay mounted
+          router.push("/")
+        }
       }
     } catch (error) {
       console.error("Authentication error:", error)
@@ -89,6 +142,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 disabled={isLoading}
+                minLength={6}
               />
             </div>
 
@@ -99,7 +153,7 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Loading..." : isSignUp ? "Sign up" : "Login"}
+              {getButtonText()}
             </Button>
           </form>
 
