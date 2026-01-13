@@ -3,9 +3,9 @@
 ## Project Overview
 
 **Project Name**: Next.js Supabase Dashboard  
-**Purpose**: Multi-business metrics dashboard with OTP authentication for monitoring analytics  
+**Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: Dashboard, OTP authentication, and business selector complete
+**Development Status**: Dashboard, OTP authentication, role-based business access, and client-side auth complete
 
 ---
 
@@ -127,6 +127,7 @@ nextjs-supabase/
 │   │       ├── table.tsx
 │   │       └── tabs.tsx
 │   ├── contexts/
+│   │   ├── auth-context.tsx    # Centralized authentication state
 │   │   └── business-context.tsx  # Business state management
 │   ├── lib/
 │   │   ├── auth/
@@ -196,6 +197,7 @@ Required in `.env.local`:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_ADMIN_EMAIL=admin@example.com
 ```
 
 **Current Setup**: Self-hosted Supabase instance at `https://supabase.genzai.cloud`
