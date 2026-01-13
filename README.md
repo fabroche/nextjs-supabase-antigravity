@@ -16,6 +16,8 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 - 📱 **Responsive Design** - Optimized for desktop, tablet, and mobile
 - 🌓 **Dark Mode** - Automatic theme switching support
 - 🔐 **Authentication** - Secure login/register with Supabase Auth
+- ✉️ **OTP Email Verification** - 6-digit code verification for new users
+- 🏢 **Business Selector** - Switch between multiple businesses with dynamic metrics
 - 🛡️ **Protected Routes** - Middleware-based route protection
 - 👤 **User Management** - Session handling and user profiles
 - ⚡ **Fast & Optimized** - Server-side rendering with Next.js 16
@@ -23,16 +25,18 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 
 ### Current Dashboard Components
 
+- **Business Selector** - Dropdown to switch between different businesses
 - **Collapsible Sidebar** - Easy navigation with icon-only collapsed state
 - **Search & Notifications** - Quick access to search and notification center
-- **Metric Cards** - Display key metrics with trend indicators
+- **Metric Cards** - Display key metrics with trend indicators (dynamic per business)
   - Total Revenue
   - Active Users
   - Sales
   - Active Now
-- **Overview Chart** - Visual representation of monthly data
-- **Recent Activity Table** - Latest transactions and user activity
+- **Animated Overview Chart** - Visual representation of monthly data with smooth transitions
+- **Recent Activity Table** - Latest transactions and user activity (per business)
 - **Tab Navigation** - Organized sections (Overview, Analytics, Reports)
+- **Theme Toggle** - Switch between light and dark modes
 
 ---
 
@@ -43,7 +47,8 @@ The application includes a complete authentication system powered by Supabase Au
 ### Features
 
 - ✅ **Email/Password Login** - Secure authentication with Supabase
-- ✅ **User Registration** - New user sign-up with email verification
+- ✅ **User Registration** - New user sign-up with OTP email verification
+- ✅ **OTP Verification** - 6-digit code sent via email using shadcn input-otp component
 - ✅ **Session Management** - Persistent sessions with HTTP-only cookies
 - ✅ **Protected Routes** - Automatic redirect for unauthenticated users
 - ✅ **User Menu** - Profile dropdown with logout functionality
@@ -65,9 +70,12 @@ Password: your-password
 ### Authentication Flow
 
 1. **Unauthenticated users** are automatically redirected to `/login`
-2. **After login**, users are redirected to the dashboard (`/`)
-3. **Session persists** across page refreshes
-4. **Logout** clears the session and redirects to `/login`
+2. **New users register** → Receive 6-digit OTP code via email
+3. **User enters OTP** on `/verify-email` page → Email verified
+4. **After verification**, users can log in
+5. **After login**, users are redirected to the dashboard (`/`)
+6. **Session persists** across page refreshes
+7. **Logout** clears the session and redirects to `/login`
 
 ### Supabase Auth Setup
 

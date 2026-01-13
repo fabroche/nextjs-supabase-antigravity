@@ -11,7 +11,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useBusiness } from "@/contexts/business-context"
 
 export default function DashboardPage() {
-  const { selectedBusiness } = useBusiness()
+  const { selectedBusiness, isLoading } = useBusiness()
+
+  // Show loading state while business is being determined
+  if (isLoading || !selectedBusiness) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
+
   const { metrics } = selectedBusiness
 
   return (

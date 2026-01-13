@@ -3,6 +3,7 @@
 export interface Business {
   id: string
   name: string
+  ownerEmail: string  // Email of the user who owns this business
   metrics: {
     totalRevenue: number
     revenueChange: number
@@ -30,6 +31,7 @@ export const mockBusinesses: Business[] = [
   {
     id: "business-1",
     name: "Tech Solutions Inc.",
+    ownerEmail: "kraxusmmo@gmail.com",  // Associated with this user
     metrics: {
       totalRevenue: 45231.89,
       revenueChange: 20.1,
@@ -78,17 +80,18 @@ export const mockBusinesses: Business[] = [
       },
     ],
     chartData: [
-      { month: "Ene", value: 12500 },
-      { month: "Feb", value: 18200 },
-      { month: "Mar", value: 15800 },
-      { month: "Abr", value: 22100 },
-      { month: "May", value: 19500 },
-      { month: "Jun", value: 25300 },
+      { month: "Ene", value: 8500 },
+      { month: "Feb", value: 22000 },
+      { month: "Mar", value: 12300 },
+      { month: "Abr", value: 28500 },
+      { month: "May", value: 15800 },
+      { month: "Jun", value: 32100 },
     ],
   },
   {
     id: "business-2",
     name: "E-Commerce Pro",
+    ownerEmail: "user2@example.com",  // Associated with this user
     metrics: {
       totalRevenue: 78450.25,
       revenueChange: 35.5,
@@ -137,17 +140,18 @@ export const mockBusinesses: Business[] = [
       },
     ],
     chartData: [
-      { month: "Ene", value: 28500 },
-      { month: "Feb", value: 32200 },
-      { month: "Mar", value: 29800 },
-      { month: "Abr", value: 38100 },
-      { month: "May", value: 35900 },
-      { month: "Jun", value: 42600 },
+      { month: "Ene", value: 35000 },
+      { month: "Feb", value: 28500 },
+      { month: "Mar", value: 42000 },
+      { month: "Abr", value: 31200 },
+      { month: "May", value: 48500 },
+      { month: "Jun", value: 39800 },
     ],
   },
   {
     id: "business-3",
     name: "Marketing Agency",
+    ownerEmail: "user3@example.com",  // Associated with this user
     metrics: {
       totalRevenue: 32150.50,
       revenueChange: 12.8,
@@ -196,12 +200,23 @@ export const mockBusinesses: Business[] = [
       },
     ],
     chartData: [
-      { month: "Ene", value: 8200 },
-      { month: "Feb", value: 11600 },
-      { month: "Mar", value: 9100 },
-      { month: "Abr", value: 14200 },
-      { month: "May", value: 12900 },
-      { month: "Jun", value: 16500 },
+      { month: "Ene", value: 5200 },
+      { month: "Feb", value: 14800 },
+      { month: "Mar", value: 7500 },
+      { month: "Abr", value: 18200 },
+      { month: "May", value: 9800 },
+      { month: "Jun", value: 21500 },
     ],
   },
 ]
+
+// Helper function to get business by owner email
+export function getBusinessByOwner(ownerEmail: string): Business | undefined {
+  return mockBusinesses.find(business => business.ownerEmail === ownerEmail)
+}
+
+// Helper function to check if user is admin
+export function isAdminUser(email: string): boolean {
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "brochegomezf@gmail.com"
+  return email === adminEmail
+}
