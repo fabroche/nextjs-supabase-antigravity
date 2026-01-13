@@ -3,12 +3,16 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { signIn, signUp } from "@/lib/auth/actions"
 
 export default function LoginPage() {
+  const searchParams = useSearchParams()
+  const verified = searchParams.get("verified")
+  
   const [isLoading, setIsLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [isSignUp, setIsSignUp] = React.useState(false)
@@ -48,6 +52,12 @@ export default function LoginPage() {
                 : "Enter your email below to login to your account"}
             </p>
           </div>
+
+          {verified === "true" && (
+            <div className="rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3 text-sm text-green-800 dark:text-green-200">
+              ✓ Email verified successfully! You can now log in.
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="grid gap-4">
             <div className="grid gap-2">

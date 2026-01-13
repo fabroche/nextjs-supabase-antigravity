@@ -25,19 +25,25 @@ export async function signIn(formData: FormData) {
 export async function signUp(formData: FormData) {
   const supabase = await createClient()
 
-  const data = {
-    email: formData.get("email") as string,
-    password: formData.get("password") as string,
-  }
+  const email = formData.get("email") as string
+  const password = formData.get("password") as string
 
-  const { error } = await supabase.auth.signUp(data)
+  // Sign up with email OTP verification
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      // Use email OTP instead of email link
+      emailRedirectTo: undefined,
+    },
+  })
 
   if (error) {
     return { error: error.message }
   }
 
-  revalidatePath("/", "layout")
-  redirect("/")
+  // Redirect to verify email page with just the email
+  redirect(`/verify-email?email=${encodeURIComponent(email)}`)
 }
 
 export async function signOut() {
