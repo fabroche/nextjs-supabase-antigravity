@@ -11,15 +11,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MobileSidebar } from "./sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { signOut } from "@/lib/auth/actions"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useBusiness } from "@/contexts/business-context"
 
 export function Header() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const { selectedBusiness, setSelectedBusiness, businesses } = useBusiness()
 
   useEffect(() => {
     async function loadUser() {
@@ -32,6 +41,13 @@ export function Header() {
 
   async function handleSignOut() {
     await signOut()
+  }
+
+  function handleBusinessChange(businessId: string) {
+    const business = businesses.find(b => b.id === businessId)
+    if (business) {
+      setSelectedBusiness(business)
+    }
   }
 
   return (
@@ -52,6 +68,20 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Business Selector */}
+        <Select value={selectedBusiness.id} onValueChange={handleBusinessChange}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {businesses.map((business) => (
+              <SelectItem key={business.id} value={business.id}>
+                {business.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <ThemeToggle />
         
         <Button variant="ghost" size="icon" className="relative">

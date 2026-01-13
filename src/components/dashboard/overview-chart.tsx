@@ -2,17 +2,16 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-// Placeholder for chart - you can integrate a charting library like recharts later
-export function OverviewChart() {
-  const data = [
-    { month: "Ene", value: 4000 },
-    { month: "Feb", value: 3000 },
-    { month: "Mar", value: 5000 },
-    { month: "Abr", value: 4500 },
-    { month: "May", value: 6000 },
-    { month: "Jun", value: 5500 },
-  ]
+interface ChartData {
+  month: string
+  value: number
+}
 
+interface OverviewChartProps {
+  data: ChartData[]
+}
+
+export function OverviewChart({ data }: OverviewChartProps) {
   const maxValue = Math.max(...data.map((d) => d.value))
 
   return (
@@ -41,3 +40,4 @@ export function OverviewChart() {
     </Card>
   )
 }
+

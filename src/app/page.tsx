@@ -1,3 +1,5 @@
+"use client"
+
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
@@ -6,8 +8,12 @@ import { OverviewChart } from "@/components/dashboard/overview-chart"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useBusiness } from "@/contexts/business-context"
 
 export default function DashboardPage() {
+  const { selectedBusiness } = useBusiness()
+  const { metrics } = selectedBusiness
+
   return (
     <div className="flex min-h-screen">
       <Sidebar />
@@ -19,9 +25,9 @@ export default function DashboardPage() {
           {/* Page Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+              <h1 className="text-3xl font-bold tracking-tight">{selectedBusiness.name}</h1>
               <p className="text-muted-foreground">
-                Resumen de tus métricas y actividad
+                  Resumen de métricas y actividad
               </p>
             </div>
           </div>
@@ -39,29 +45,29 @@ export default function DashboardPage() {
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <MetricCard
                   title="Ingresos Totales"
-                  value="$45,231.89"
-                  change="+20.1% desde el mes pasado"
+                  value={`$${metrics.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  change={`+${metrics.revenueChange}% desde el mes pasado`}
                   changeType="positive"
                   icon={DollarSign}
                 />
                 <MetricCard
                   title="Usuarios Activos"
-                  value="+2,350"
-                  change="+180.1% desde el mes pasado"
+                  value={`+${metrics.activeUsers.toLocaleString()}`}
+                  change={`+${metrics.usersChange}% desde el mes pasado`}
                   changeType="positive"
                   icon={Users}
                 />
                 <MetricCard
                   title="Ventas"
-                  value="+12,234"
-                  change="+19% desde el mes pasado"
+                  value={`+${metrics.sales.toLocaleString()}`}
+                  change={`+${metrics.salesChange}% desde el mes pasado`}
                   changeType="positive"
                   icon={CreditCard}
                 />
                 <MetricCard
                   title="Activos Ahora"
-                  value="+573"
-                  change="+201 desde hace 1 hora"
+                  value={`+${metrics.activeNow}`}
+                  change={`+${metrics.activeNowChange} desde hace 1 hora`}
                   changeType="positive"
                   icon={Activity}
                 />
@@ -70,7 +76,7 @@ export default function DashboardPage() {
               {/* Charts and Activity */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-4">
-                  <OverviewChart />
+                  <OverviewChart data={selectedBusiness.chartData} />
                 </div>
                 <Card className="col-span-3">
                   <CardHeader>
@@ -80,7 +86,7 @@ export default function DashboardPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <RecentActivity />
+                    <RecentActivity activities={selectedBusiness.recentActivity} />
                   </CardContent>
                 </Card>
               </div>
