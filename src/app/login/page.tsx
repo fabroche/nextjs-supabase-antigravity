@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -9,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 
-export default function LoginPage() {
+// Component that uses useSearchParams - wrapped in Suspense
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const verified = searchParams.get("verified")
@@ -201,5 +203,18 @@ export default function LoginPage() {
         />
       </div>
     </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
