@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,7 +9,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { Mail } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
-export default function VerifyEmailPage() {
+// Component that uses useSearchParams - wrapped in Suspense
+function VerifyEmailForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const email = searchParams.get("email")
@@ -173,5 +175,18 @@ export default function VerifyEmailPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <VerifyEmailForm />
+    </Suspense>
   )
 }

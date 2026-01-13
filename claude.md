@@ -1,11 +1,25 @@
 # Project Context & Memory
 
+> **🚨 CRITICAL REMINDER FOR AI AGENTS 🚨**
+>
+> **ALWAYS UPDATE DOCUMENTATION AFTER IMPLEMENTING A FEATURE!**
+>
+> After completing ANY feature implementation, bug fix, or architectural change, you MUST:
+>
+> 1. Update `README.md` with user-facing changes
+> 2. Update `claude.md` with technical implementation details
+> 3. Update the "Last Updated" date at the bottom of both files
+>
+> **DO NOT SKIP THIS STEP!** Documentation is as important as the code itself.
+
+---
+
 ## Project Overview
 
 **Project Name**: Next.js Supabase Dashboard  
 **Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: Dashboard, OTP authentication, role-based business access, and client-side auth complete
+**Development Status**: Production-ready with Suspense-wrapped client components for build compatibility
 
 ---
 
