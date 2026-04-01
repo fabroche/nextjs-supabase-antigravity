@@ -1,7 +1,6 @@
 "use client"
 
-import { Bell, Search, User, LogOut } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -44,18 +43,7 @@ export function Header() {
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">
       <MobileSidebar />
       
-      <div className="flex-1 flex items-center gap-4">
-        <form className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="pl-8 w-full"
-            />
-          </div>
-        </form>
-      </div>
+      <div className="flex-1" />
 
       <div className="flex items-center gap-2">
         {/* Business Selector - Only visible for admin users */}
@@ -76,11 +64,6 @@ export function Header() {
 
         <ThemeToggle />
         
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
-        </Button>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">

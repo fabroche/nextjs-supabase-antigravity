@@ -5,9 +5,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
-  BarChart3,
-  FileText,
-  Settings,
   ChevronLeft,
   Menu,
 } from "lucide-react"
@@ -21,21 +18,6 @@ const sidebarNav = [
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Analytics",
-    href: "/analytics",
-    icon: BarChart3,
-  },
-  {
-    title: "Reports",
-    href: "/reports",
-    icon: FileText,
-  },
-  {
-    title: "Settings",
-    href: "/settings",
-    icon: Settings,
   },
 ]
 

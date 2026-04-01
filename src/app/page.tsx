@@ -5,8 +5,6 @@ import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { OverviewChart } from "@/components/dashboard/overview-chart"
-import { RecentActivity } from "@/components/dashboard/recent-activity"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useBusiness } from "@/contexts/business-context"
 
@@ -46,8 +44,6 @@ export default function DashboardPage() {
           <Tabs defaultValue="overview" className="space-y-4">
             <TabsList>
               <TabsTrigger value="overview">Resumen</TabsTrigger>
-              <TabsTrigger value="analytics">Analíticas</TabsTrigger>
-              <TabsTrigger value="reports">Reportes</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
@@ -83,52 +79,10 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Charts and Activity */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <div className="col-span-4">
-                  <OverviewChart data={selectedBusiness.chartData} />
-                </div>
-                <Card className="col-span-3">
-                  <CardHeader>
-                    <CardTitle>Actividad Reciente</CardTitle>
-                    <CardDescription>
-                      Últimas 5 transacciones realizadas
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <RecentActivity activities={selectedBusiness.recentActivity} />
-                  </CardContent>
-                </Card>
-              </div>
+              {/* Chart */}
+              <OverviewChart data={selectedBusiness.chartData} />
             </TabsContent>
 
-            <TabsContent value="analytics" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Analíticas</CardTitle>
-                  <CardDescription>
-                    Análisis detallado de tus métricas
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="h-[400px] flex items-center justify-center text-muted-foreground">
-                  Contenido de analíticas próximamente...
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="reports" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Reportes</CardTitle>
-                  <CardDescription>
-                    Genera y descarga reportes personalizados
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="h-[400px] flex items-center justify-center text-muted-foreground">
-                  Contenido de reportes próximamente...
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </main>
       </div>
