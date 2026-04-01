@@ -674,6 +674,12 @@ export default async function Page() {
 
 ## Quick Reference
 
+### Vercel Documentation
+
+For deployment and Vercel-specific features, consult the official documentation:
+
+- **LLM-optimized docs**: https://vercel.com/docs/llms-full.txt
+
 ### Adding a New Metric Card
 
 ```typescript
