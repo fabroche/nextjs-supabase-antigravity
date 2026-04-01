@@ -55,15 +55,23 @@ export function BusinessProvider({ children }: Readonly<{ children: ReactNode }>
     setIsLoading(false)
   }, [user, authLoading])
 
+  // Filter businesses based on role: admin sees all, negocio sees only their own
+  const filteredBusinesses = React.useMemo(() => {
+    if (isAdmin) return mockBusinesses
+    const userEmail = user?.email
+    if (!userEmail) return []
+    return mockBusinesses.filter(b => b.ownerEmail === userEmail)
+  }, [isAdmin, user?.email])
+
   const contextValue = React.useMemo(
     () => ({
       selectedBusiness,
       setSelectedBusiness,
-      businesses: mockBusinesses,
+      businesses: filteredBusinesses,
       isAdmin,
       isLoading,
     }),
-    [selectedBusiness, isAdmin, isLoading]
+    [selectedBusiness, setSelectedBusiness, filteredBusinesses, isAdmin, isLoading]
   )
 
   return (
