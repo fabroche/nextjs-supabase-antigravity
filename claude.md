@@ -19,7 +19,8 @@
 **Project Name**: Next.js Supabase Dashboard  
 **Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: Production-ready with Suspense-wrapped client components for build compatibility
+**Development Status**: v0 release — cleaned UI, role-based access, mock data  
+**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.5.0 - pending)
 
 ---
 
@@ -160,7 +161,9 @@ nextjs-supabase/
 ├── components.json               # shadcn/ui configuration
 ├── tsconfig.json                 # TypeScript configuration
 ├── .env.local                    # Environment variables (gitignored)
-└── package.json                  # Dependencies
+├── package.json                  # Dependencies
+├── SPRINT-1-PLAN.md             # Sprint 1 implementation plan (v0.4.0)
+└── SPRINT-2-PLAN.md             # Sprint 2 implementation plan (v0.5.0)
 ```
 
 ---
@@ -226,21 +229,22 @@ NEXT_PUBLIC_ADMIN_EMAIL=admin@example.com
 
 - **Sidebar Navigation** (Desktop)
   - Collapsible: 256px expanded → 64px collapsed
-  - Navigation items: Dashboard, Analytics, Reports, Settings
+  - Navigation items: Dashboard only (Analytics, Reports, Settings hidden for v0)
   - Active state highlighting
   - Smooth transitions
 - **Mobile Sidebar**
   - Sheet overlay triggered by hamburger menu
-  - Full navigation access on mobile
+  - Same nav items as desktop (Dashboard only)
 
 #### 2. Header Component
 
-- Search bar with icon
-- Notification bell (with badge indicator)
+- Business selector (admin only — see Role System below)
+- Theme toggle (dark/light mode)
 - User dropdown menu:
   - Profile information
   - Settings link
   - Logout option
+- **Hidden for v0**: Search bar, notification bell (planned for future sprints)
 
 #### 3. Metric Cards
 
@@ -259,18 +263,14 @@ Features:
 
 #### 4. Data Visualization
 
-- **Overview Chart**: Simple bar chart (6 months)
+- **Overview Chart**: Simple bar chart (6 months), full-width layout
   - Placeholder for advanced charting library (Recharts recommended)
-- **Recent Activity Table**: 5 recent transactions
-  - User avatars
-  - Status badges
-  - Transaction amounts
+- **Recent Activity**: Hidden for v0 (component exists at `recent-activity.tsx` but unused, pending redesign)
 
 #### 5. Tab Navigation
 
-- Overview (default)
-- Analytics (placeholder)
-- Reports (placeholder)
+- Resumen/Overview (default, only visible tab)
+- Analytics and Reports tabs hidden for v0 (structure preserved in code for Sprint 2)
 
 #### 6. Authentication System
 
@@ -339,30 +339,42 @@ Features:
 - Password hashing by Supabase
 - CSRF protection via Next.js
 
-#### 7. Business Context System
+#### 7. Business Context & Role System
+
+**Role System** (Sprint 1 - v0.4.0):
+
+- Two roles: `admin` and `negocio`
+- **admin**: Identified by `NEXT_PUBLIC_ADMIN_EMAIL` env var. Can see all businesses and switch between them via the header selector.
+- **negocio**: Any other authenticated user. Can only see their own business (filtered by `ownerEmail` match). Business selector is hidden.
+- Role determination happens in `business-context.tsx` using `isAdminUser()` from `mock-businesses.ts`
+- The `businesses` array exposed by the context is **filtered by role** — negocio users never receive other businesses' data in the client
+- **Important**: When migrating to Supabase real data, role filtering must also be enforced server-side (RLS policies), not just client-side
 
 **Business Context** (`contexts/business-context.tsx`):
 
 - React Context for sharing selected business across components
-- Provides `selectedBusiness`, `setSelectedBusiness`, and `businesses` array
+- Provides `selectedBusiness`, `setSelectedBusiness`, `businesses` (filtered by role), `isAdmin`, `isLoading`
+- `filteredBusinesses` computed via `useMemo` based on `isAdmin` and `user.email`
 - Wraps entire app in `layout.tsx`
 
 **Mock Business Data** (`lib/data/mock-businesses.ts`):
 
 - Three sample businesses with complete metrics:
-  - Tech Solutions Inc.
-  - E-Commerce Pro
-  - Marketing Agency
+  - Tech Solutions Inc. (owner: `kraxusmmo@gmail.com`)
+  - E-Commerce Pro (owner: `user2@example.com`)
+  - Marketing Agency (owner: `user3@example.com`)
 - Each business includes:
+  - `ownerEmail` — used for role-based filtering
   - Unique metrics (revenue, users, sales, active now)
   - 6 months of chart data with varied values
   - 5 recent activity transactions
   - Status indicators (success, pending, failed)
+- Helper functions: `getBusinessByOwner(email)`, `isAdminUser(email)`
 
 **Business Selector** (in `header.tsx`):
 
-- Select dropdown before theme toggle
-- Displays all available businesses
+- Select dropdown — **only visible for admin users**
+- Displays only businesses available to the user's role
 - Updates context when selection changes
 - Triggers automatic dashboard updates
 
@@ -370,7 +382,6 @@ Features:
 
 - Metric cards update with selected business data
 - Chart animates smoothly between business data (500ms transition)
-- Recent activity table shows business-specific transactions
 - All changes happen instantly when business is selected
 
 #### 8. Animated Chart Component
@@ -531,22 +542,46 @@ npx shadcn@latest add select
   - Auto-redirect after verification
 
 - ✅ **Business Selector** (Completed)
+
   - Business context provider
   - Mock business data (3 businesses)
-  - Select dropdown in header
+  - Select dropdown in header (admin only)
   - Dynamic metric updates
   - Animated chart transitions
   - Per-business activity data
 
----
+- ✅ **Role-Based Access** (Sprint 1 - v0.4.0)
+
+  - Admin vs negocio roles
+  - Businesses array filtered by role in context
+  - Business selector hidden for non-admin users
+  - Role determined by admin email env var
+
+- ✅ **v0 UI Cleanup** (Sprint 1 - v0.4.0)
+  - Notification bell hidden (future feature)
+  - Search bar hidden (future feature — 2 proposals documented in SPRINT-1-PLAN.md)
+  - Sidebar reduced to Dashboard only
+  - Tabs reduced to Resumen only
+  - Recent activity section hidden (pending redesign)
+  - Chart expanded to full width
+
+### Sprint 2 — Planned (v0.5.0)
+
+> Detailed plan in `SPRINT-2-PLAN.md`
+
+- **Reports Tab**: Date range picker + report table + CSV/Excel export
+- Re-enable "Reportes" tab in dashboard
+- Components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
+- Dependencies to install: shadcn calendar, popover, papaparse
+
+### Future Sprints (Backlog)
 
 - **Real-time Updates**: Supabase subscriptions
-- **Filtering & Date Ranges**: Date pickers, custom filters
-- **Export Functionality**: PDF/CSV reports
-- **Analytics Page**: Detailed analytics views
-- **Reports Page**: Custom report generation
-- **Settings Page**: User preferences, team management
+- **Search**: Client-side (fuse.js) or Supabase full-text search (see proposals in SPRINT-1-PLAN.md)
 - **Notifications**: Real-time notification system
+- **Analytics Page**: Detailed analytics views
+- **Settings Page**: User preferences, team management
+- **Database Schema**: Replace mock data with Supabase tables + RLS policies
 - **Mobile Optimization**: Enhanced mobile experience
 
 ---
@@ -590,9 +625,10 @@ export default async function Page() {
 1. **Chart Library**: Current chart is a placeholder. Integrate Recharts or similar for production.
 2. **Avatar Images**: Placeholder paths (`/avatars/01.png`) need real images or dynamic generation.
 3. **Mock Data**: All current data is hardcoded. Replace with Supabase queries.
-4. **Navigation Routes**: Analytics, Reports, Settings routes not yet created.
+4. **Role Security**: Client-side role filtering only. Must add Supabase RLS when migrating to real data.
 5. **Error Handling**: Add error boundaries and loading states.
 6. **Accessibility**: Ensure ARIA labels and keyboard navigation.
+7. **Hidden Features**: Notifications, search, activity, extra tabs, and sidebar nav items are hidden (not deleted) for v0. Components still exist in codebase.
 
 ---
 
@@ -689,6 +725,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-01-13_  
-_Version: 0.3.0_  
-_Status: Dashboard + OTP Authentication + Business Selector Complete_
+_Last Updated: 2026-04-01_  
+_Version: 0.4.0_  
+_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup (Sprint 1 Complete)_
