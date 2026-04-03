@@ -19,8 +19,9 @@
 **Project Name**: Next.js Supabase Dashboard  
 **Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: v0 release — cleaned UI, role-based access, mock data  
-**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.5.0 - pending)
+**Development Status**: v0 release — cleaned UI, role-based access, mock data, DB schema ready  
+**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.5.0 - pending)  
+**Next Step**: Execute migrations in Supabase, then connect frontend to real data (plan approved, see below)
 
 ---
 
@@ -627,6 +628,19 @@ npx shadcn@latest add select
 - Components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
 - Dependencies to install: shadcn calendar, popover, papaparse
 
+### Next Up — Frontend Data Integration (plan approved)
+
+> Plan saved in `.claude/plans/bright-flowing-river.md`
+
+Connect frontend to real Supabase data (client-side fetching):
+1. Execute 4 SQL migrations in Supabase SQL Editor
+2. Create `src/lib/supabase/types.ts` — TypeScript interfaces for DB tables
+3. Create `src/lib/supabase/queries.ts` — Query functions (fetchBusinesses, fetchBusinessMetrics, fetchChartData, etc.)
+4. Rewrite `src/contexts/business-context.tsx` — Replace mock imports with Supabase queries
+5. Adapt `src/app/page.tsx` — Add `isLoadingData` state
+6. Delete `src/lib/data/mock-businesses.ts`
+7. Update docs
+
 ### Future Sprints (Backlog)
 
 - **Real-time Updates**: Supabase subscriptions
@@ -634,7 +648,6 @@ npx shadcn@latest add select
 - **Notifications**: Real-time notification system
 - **Analytics Page**: Detailed analytics views
 - **Settings Page**: User preferences, team management
-- **Database Schema**: Replace mock data with Supabase tables + RLS policies
 - **Mobile Optimization**: Enhanced mobile experience
 
 ---
@@ -784,6 +797,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-01_  
+_Last Updated: 2026-04-03_  
 _Version: 0.4.1_  
-_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Schema (Sprint 1 Complete, Schema Ready)_
+_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Schema (Sprint 1 Complete, Frontend Integration Plan Approved)_
