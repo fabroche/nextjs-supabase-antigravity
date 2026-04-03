@@ -220,6 +220,12 @@ nextjs-supabase/
 ├── public/
 │   └── assets/
 │       └── login-cover.png    # Login page image
+├── supabase/
+│   └── migrations/            # SQL migration files
+│       ├── 001_foundation.sql
+│       ├── 002_business_data.sql
+│       ├── 003_views_and_functions.sql
+│       └── 004_seed_data.sql
 ├── components.json            # shadcn/ui config
 ├── claude.md                  # Project memory & context
 └── README.md                  # This file
@@ -331,30 +337,44 @@ const sidebarNav = [
 
 ## 🗄️ Database Setup
 
-### Supabase Tables (Example)
+### Schema Overview
 
-Create tables in your Supabase project for metrics:
+The database consists of 4 tables, 1 view, and 3 helper functions:
 
-```sql
--- Example: Metrics table
-create table metrics (
-  id uuid default uuid_generate_v4() primary key,
-  metric_name text not null,
-  value numeric not null,
-  change_percentage numeric,
-  created_at timestamp with time zone default timezone('utc'::text, now())
-);
+| Table | Purpose |
+|-------|---------|
+| `user_profiles` | User roles (admin/negocio), linked 1:1 to `auth.users` |
+| `businesses` | Business entities owned by users (1 user = N businesses) |
+| `transactions` | All financial transactions — metrics are derived from this |
+| `business_metrics_snapshot` | Daily snapshots for non-transaction metrics (active users) |
 
--- Example: Activity logs
-create table activity_logs (
-  id uuid default uuid_generate_v4() primary key,
-  user_id uuid references auth.users,
-  action text not null,
-  amount numeric,
-  status text,
-  created_at timestamp with time zone default timezone('utc'::text, now())
-);
+### Running Migrations
+
+Execute the SQL migration files in order in your Supabase SQL Editor:
+
+```bash
+supabase/migrations/
+├── 001_foundation.sql           # Functions, user_profiles, triggers
+├── 002_business_data.sql        # businesses, transactions, snapshots + RLS
+├── 003_views_and_functions.sql  # business_metrics view, RPC functions
+└── 004_seed_data.sql            # Initial data (run after users sign up)
 ```
+
+### Row Level Security (RLS)
+
+All tables have RLS enabled:
+- **Admin** users can read/write all data
+- **Negocio** users can only access their own businesses and transactions
+- Role check uses a `SECURITY DEFINER` function (`is_admin()`) to avoid RLS recursion
+
+### Key Database Functions
+
+| Function | Purpose |
+|----------|---------|
+| `is_admin()` | Check if current user is admin (used in RLS policies) |
+| `get_user_role()` | RPC to get the authenticated user's role |
+| `get_monthly_chart_data(business_id, months)` | RPC to get monthly revenue for charts |
+| `business_metrics` (view) | Aggregated revenue/sales metrics per business |
 
 ---
 

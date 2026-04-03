@@ -158,6 +158,12 @@ nextjs-supabase/
 ├── public/
 │   └── assets/
 │       └── login-cover.png       # Login page cover image
+├── supabase/
+│   └── migrations/
+│       ├── 001_foundation.sql         # Functions, user_profiles, triggers
+│       ├── 002_business_data.sql      # businesses, transactions, snapshots
+│       ├── 003_views_and_functions.sql # Views and RPC functions
+│       └── 004_seed_data.sql          # Initial seed data
 ├── components.json               # shadcn/ui configuration
 ├── tsconfig.json                 # TypeScript configuration
 ├── .env.local                    # Environment variables (gitignored)
@@ -461,6 +467,42 @@ import { createServerClient } from "@supabase/ssr";
 
 - Session management utilities
 
+### Database Schema
+
+**Tables** (defined in `supabase/migrations/`):
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `user_profiles` | User roles, linked 1:1 to `auth.users` | `id` (FK), `role` ('admin'/'negocio'), `full_name` |
+| `businesses` | Business entities (1 user = N businesses) | `id`, `owner_id` (FK), `name`, `currency` |
+| `transactions` | Financial transactions — all metrics derived from this | `id`, `business_id` (FK), `customer_name`, `customer_email`, `amount`, `status`, `concept`, `category` |
+| `business_metrics_snapshot` | Daily snapshots for active users | `id`, `business_id` (FK), `active_users`, `active_now`, `snapshot_date` |
+
+**View**: `business_metrics` — Aggregates `transactions` to derive `total_revenue`, `revenue_change`, `sales`, `sales_change` per business (current vs previous month).
+
+**Functions**:
+- `is_admin()` — SECURITY DEFINER helper used in all RLS policies
+- `get_user_role()` — RPC to get authenticated user's role
+- `get_monthly_chart_data(business_id, months)` — RPC for chart data (monthly revenue via `generate_series`)
+
+**Triggers**:
+- `handle_new_user` — Auto-creates `user_profiles` row on signup with `role = 'negocio'`
+- `update_updated_at` — Auto-updates `updated_at` on `user_profiles` and `businesses`
+
+**RLS Pattern**: All tables have RLS enabled. Negocio users access only their own data (via `owner_id` or `business_id` chain). Admin users access everything via `is_admin()`.
+
+**Indexes**: Composite index on `transactions(business_id, status, created_at DESC)` covers the main metrics/chart queries.
+
+### Migration Files
+
+```
+supabase/migrations/
+├── 001_foundation.sql           # is_admin(), user_profiles, handle_new_user trigger
+├── 002_business_data.sql        # businesses, transactions, snapshots + RLS + indexes
+├── 003_views_and_functions.sql  # business_metrics view, RPC functions
+└── 004_seed_data.sql            # Admin promotion, 3 businesses, transactions, snapshots
+```
+
 ### Current Status
 
 - ✅ Supabase clients configured
@@ -468,8 +510,11 @@ import { createServerClient } from "@supabase/ssr";
 - ✅ Authentication system implemented
 - ✅ Protected routes configured
 - ✅ User session management active
-- ⏳ Database schema for metrics not yet defined
-- ⏳ No active data queries implemented (using mock data)
+- ✅ Database schema designed (4 tables + 1 view + 3 functions + 2 triggers)
+- ✅ RLS policies defined for all tables
+- ✅ Migration files created
+- ⏳ Migrations not yet executed in Supabase
+- ⏳ Frontend not yet connected to real data (still using mock data)
 
 ---
 
@@ -504,17 +549,16 @@ npx shadcn@latest add select
 
 ### Immediate Priorities
 
-1. **Database Schema Design**
+1. **Execute Migrations**
 
-   - Define metrics tables
-   - User management
-   - Activity logs
-   - Analytics data
+   - Run `001_foundation.sql` through `004_seed_data.sql` in Supabase SQL Editor
+   - Verify tables, RLS policies, and triggers are working
 
 2. **Data Integration**
 
-   - Connect metric cards to real Supabase data
-   - Implement data fetching in Server Components
+   - Connect metric cards to real Supabase data (replace mock-businesses.ts)
+   - Update `BusinessContext` to fetch from `businesses` table + `business_metrics` view
+   - Update role check to use `get_user_role()` RPC instead of env var
    - Add loading states
 
 3. **Advanced Charting**
@@ -564,6 +608,15 @@ npx shadcn@latest add select
   - Tabs reduced to Resumen only
   - Recent activity section hidden (pending redesign)
   - Chart expanded to full width
+
+- ✅ **Database Schema** (v0.4.1)
+  - 4 tables: `user_profiles`, `businesses`, `transactions`, `business_metrics_snapshot`
+  - `business_metrics` view for derived revenue/sales metrics
+  - RPC functions: `get_monthly_chart_data`, `get_user_role`
+  - RLS policies on all tables (admin sees all, negocio sees own data)
+  - Auto-profile creation trigger on signup
+  - Seed data matching current mock businesses
+  - Migration files in `supabase/migrations/`
 
 ### Sprint 2 — Planned (v0.5.0)
 
@@ -624,8 +677,8 @@ export default async function Page() {
 
 1. **Chart Library**: Current chart is a placeholder. Integrate Recharts or similar for production.
 2. **Avatar Images**: Placeholder paths (`/avatars/01.png`) need real images or dynamic generation.
-3. **Mock Data**: All current data is hardcoded. Replace with Supabase queries.
-4. **Role Security**: Client-side role filtering only. Must add Supabase RLS when migrating to real data.
+3. **Mock Data**: Frontend still uses hardcoded mock data. Schema is ready — next step is connecting frontend to Supabase queries.
+4. **Role Security**: Client-side role filtering only. RLS policies are defined but migrations not yet executed. Must run migrations and update frontend to use DB roles.
 5. **Error Handling**: Add error boundaries and loading states.
 6. **Accessibility**: Ensure ARIA labels and keyboard navigation.
 7. **Hidden Features**: Notifications, search, activity, extra tabs, and sidebar nav items are hidden (not deleted) for v0. Components still exist in codebase.
@@ -732,5 +785,5 @@ className = "bg-destructive text-destructive-foreground";
 ---
 
 _Last Updated: 2026-04-01_  
-_Version: 0.4.0_  
-_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup (Sprint 1 Complete)_
+_Version: 0.4.1_  
+_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Schema (Sprint 1 Complete, Schema Ready)_
