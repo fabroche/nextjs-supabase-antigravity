@@ -1,0 +1,162 @@
+# Database Migrations
+
+## Overview
+
+This directory contains SQL migration files for the Supabase (PostgreSQL) database. Migrations define the complete database schema: tables, views, functions, triggers, RLS policies, and indexes.
+
+**Supabase Instance**: Self-hosted at `https://supabase.genzai.cloud`
+
+---
+
+## Migration Files
+
+| # | File | Description |
+|---|------|-------------|
+| 1 | `001_foundation.sql` | `update_updated_at()` function, `user_profiles` table, `is_admin()` helper, RLS policies, `handle_new_user` trigger |
+| 2 | `002_business_data.sql` | `businesses`, `transactions`, `business_metrics_snapshot` tables with RLS policies and indexes |
+| 3 | `003_views_and_functions.sql` | `business_metrics` view, `get_monthly_chart_data` and `get_user_role` RPC functions |
+| 4 | `004_seed_data.sql` | Promotes admin, inserts 3 test businesses, transactions (recent + historical), and metric snapshots |
+
+---
+
+## How to Execute Migrations
+
+### Prerequisites
+
+- Access to the Supabase Dashboard SQL Editor
+- Users referenced in `004_seed_data.sql` must exist in `auth.users` before running that file
+
+### Step-by-Step
+
+1. Open the Supabase Dashboard at `https://supabase.genzai.cloud`
+2. Navigate to **SQL Editor**
+3. Copy and paste each migration file **one at a time, in order** (001 -> 002 -> 003 -> 004)
+4. Click **Run** and wait for **Success** before proceeding to the next file
+5. If a migration fails, **do not skip it** — fix the error before continuing
+
+### Pre-seed Setup (before running 004)
+
+If users were registered **before** migration 001 was executed, they won't have `user_profiles` rows (the auto-create trigger only fires for new signups). Run this before `004_seed_data.sql`:
+
+```sql
+INSERT INTO public.user_profiles (id, full_name)
+SELECT id, COALESCE(raw_user_meta_data->>'full_name', '')
+FROM auth.users
+WHERE id NOT IN (SELECT id FROM public.user_profiles);
+```
+
+### Verification Queries
+
+After running all 4 migrations, verify with:
+
+```sql
+-- Tables exist
+SELECT table_name FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_name IN ('user_profiles', 'businesses', 'transactions', 'business_metrics_snapshot')
+ORDER BY table_name;
+
+-- Functions exist
+SELECT routine_name FROM information_schema.routines
+WHERE routine_schema = 'public'
+  AND routine_name IN ('is_admin', 'update_updated_at', 'handle_new_user', 'get_monthly_chart_data', 'get_user_role');
+
+-- RLS enabled on all tables
+SELECT tablename, rowsecurity FROM pg_tables
+WHERE tablename IN ('user_profiles', 'businesses', 'transactions', 'business_metrics_snapshot');
+
+-- Indexes
+SELECT indexname, tablename FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename IN ('user_profiles', 'businesses', 'transactions', 'business_metrics_snapshot')
+ORDER BY tablename, indexname;
+
+-- View works
+SELECT * FROM business_metrics LIMIT 1;
+
+-- Seed data loaded
+SELECT COUNT(*) FROM public.businesses;         -- Expected: 3
+SELECT COUNT(*) FROM public.transactions;       -- Expected: 33
+SELECT COUNT(*) FROM public.business_metrics_snapshot;  -- Expected: 6
+```
+
+---
+
+## Schema Overview
+
+### Tables
+
+| Table | Purpose |
+|-------|---------|
+| `user_profiles` | User roles (admin/negocio), linked 1:1 to `auth.users` |
+| `businesses` | Business entities. 1 user can own N businesses |
+| `transactions` | Financial transactions. Revenue, sales, chart data are all derived from this table |
+| `business_metrics_snapshot` | Daily snapshots for metrics not derivable from transactions (active_users, active_now) |
+
+### View
+
+| View | Purpose |
+|------|---------|
+| `business_metrics` | Aggregates transactions to calculate `total_revenue`, `revenue_change`, `sales`, `sales_change` per business (current month vs previous month) |
+
+### Functions
+
+| Function | Type | Purpose |
+|----------|------|---------|
+| `is_admin()` | SECURITY DEFINER | Checks if current user is admin. Used in all RLS policies |
+| `get_user_role()` | SECURITY DEFINER (RPC) | Returns the authenticated user's role ('admin' or 'negocio') |
+| `get_monthly_chart_data(business_id, months)` | SECURITY INVOKER (RPC) | Returns monthly revenue grouped by month for chart display |
+| `update_updated_at()` | Trigger function | Auto-updates `updated_at` column on row changes |
+| `handle_new_user()` | SECURITY DEFINER | Auto-creates `user_profiles` row when a new user signs up |
+
+### RLS Pattern
+
+- **Negocio users**: Can only access their own data (via `owner_id` or `business_id` chain)
+- **Admin users**: Can access everything via `is_admin()` helper
+- All `auth.uid()` calls are wrapped in `(select auth.uid())` for performance (called once, not per row)
+- All `SECURITY DEFINER` functions use `SET search_path = ''` for security
+
+---
+
+## Important Considerations
+
+### Seed Data is for Testing Only
+
+The data in `004_seed_data.sql` (3 businesses, transactions, snapshots) is **test data**. The metrics and business structure will change as the project evolves toward real production data.
+
+### Adding New Migrations
+
+When adding a new migration:
+
+1. Create a new file with the next sequential number: `005_description.sql`
+2. Never modify already-executed migration files — create a new migration instead
+3. Test the migration locally or on a staging instance before running in production
+4. **Update this README.md** with the new migration details
+
+### Admin User
+
+The admin user is configured as `genzai.cloud@gmail.com` in both:
+- `004_seed_data.sql` (promoted to role 'admin' in DB)
+- `.env.local` → `NEXT_PUBLIC_ADMIN_EMAIL` (used by frontend until DB role integration)
+
+### Order Matters
+
+- `001` must run before `002` (businesses references user_profiles)
+- `002` must run before `003` (view and functions reference businesses and transactions)
+- `003` must run before `004` is useful (seed data should be queryable via the view)
+- Within `001`: the table is created before `is_admin()` because the function references the table
+
+---
+
+## Execution History
+
+| Date | Migration | Status | Notes |
+|------|-----------|--------|-------|
+| 2026-04-05 | 001_foundation.sql | Executed | Required reorder: table before is_admin() |
+| 2026-04-05 | 002_business_data.sql | Executed | |
+| 2026-04-05 | 003_views_and_functions.sql | Executed | |
+| 2026-04-05 | 004_seed_data.sql | Executed | Required pre-seed INSERT for existing users without profiles |
+
+---
+
+_Last Updated: 2026-04-05_

@@ -19,7 +19,7 @@
 -- ==========================================
 UPDATE public.user_profiles
 SET role = 'admin'
-WHERE id = (SELECT id FROM auth.users WHERE email = 'brochegomezf@gmail.com');
+WHERE id = (SELECT id FROM auth.users WHERE email = 'genzai.cloud@gmail.com');
 
 -- ==========================================
 -- 2. Insert businesses

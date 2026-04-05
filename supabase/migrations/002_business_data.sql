@@ -30,23 +30,23 @@ ALTER TABLE public.businesses ENABLE ROW LEVEL SECURITY;
 -- Owners can view their own businesses
 CREATE POLICY "Owners can view own businesses"
   ON public.businesses FOR SELECT
-  USING (owner_id = auth.uid());
+  USING (owner_id = (select auth.uid()));
 
 -- Owners can create businesses for themselves
 CREATE POLICY "Owners can create businesses"
   ON public.businesses FOR INSERT
-  WITH CHECK (owner_id = auth.uid());
+  WITH CHECK (owner_id = (select auth.uid()));
 
 -- Owners can update their own businesses
 CREATE POLICY "Owners can update own businesses"
   ON public.businesses FOR UPDATE
-  USING (owner_id = auth.uid())
-  WITH CHECK (owner_id = auth.uid());
+  USING (owner_id = (select auth.uid()))
+  WITH CHECK (owner_id = (select auth.uid()));
 
 -- Admins can do everything
 CREATE POLICY "Admins can manage all businesses"
   ON public.businesses FOR ALL
-  USING (public.is_admin());
+  USING ((select public.is_admin()));
 
 -- ==========================================
 -- 2. Table: transactions
@@ -84,7 +84,7 @@ CREATE POLICY "Owners can view own transactions"
     EXISTS (
       SELECT 1 FROM public.businesses
       WHERE businesses.id = transactions.business_id
-        AND businesses.owner_id = auth.uid()
+        AND businesses.owner_id = (select auth.uid())
     )
   );
 
@@ -95,7 +95,7 @@ CREATE POLICY "Owners can create transactions"
     EXISTS (
       SELECT 1 FROM public.businesses
       WHERE businesses.id = transactions.business_id
-        AND businesses.owner_id = auth.uid()
+        AND businesses.owner_id = (select auth.uid())
     )
   );
 
@@ -106,14 +106,14 @@ CREATE POLICY "Owners can update own transactions"
     EXISTS (
       SELECT 1 FROM public.businesses
       WHERE businesses.id = transactions.business_id
-        AND businesses.owner_id = auth.uid()
+        AND businesses.owner_id = (select auth.uid())
     )
   );
 
 -- Admins can do everything
 CREATE POLICY "Admins can manage all transactions"
   ON public.transactions FOR ALL
-  USING (public.is_admin());
+  USING ((select public.is_admin()));
 
 -- ==========================================
 -- 3. Table: business_metrics_snapshot
@@ -144,11 +144,11 @@ CREATE POLICY "Owners can view own snapshots"
     EXISTS (
       SELECT 1 FROM public.businesses
       WHERE businesses.id = business_metrics_snapshot.business_id
-        AND businesses.owner_id = auth.uid()
+        AND businesses.owner_id = (select auth.uid())
     )
   );
 
 -- Admins can do everything
 CREATE POLICY "Admins can manage all snapshots"
   ON public.business_metrics_snapshot FOR ALL
-  USING (public.is_admin());
+  USING ((select public.is_admin()));

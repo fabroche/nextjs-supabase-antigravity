@@ -8,7 +8,8 @@
 >
 > 1. Update `README.md` with user-facing changes
 > 2. Update `claude.md` with technical implementation details
-> 3. Update the "Last Updated" date at the bottom of both files
+> 3. Update `supabase/migrations/README.md` when adding, modifying, or executing any database migration
+> 4. Update the "Last Updated" date at the bottom of all modified docs
 >
 > **DO NOT SKIP THIS STEP!** Documentation is as important as the code itself.
 
@@ -53,7 +54,13 @@
    - **Next Steps & Roadmap** - Completed items move to "Current Features"
    - **Dependencies Summary** - New packages installed
 
-4. **Version Updates**:
+4. **When modifying database migrations**:
+
+   - Update `supabase/migrations/README.md` with new migration details
+   - Add entry to the Execution History table after running a migration
+   - Never modify already-executed migration files — create new ones instead
+
+5. **Version Updates**:
    - Update "Last Updated" date at bottom of both files
    - Increment version number when major features are added
 
@@ -514,8 +521,9 @@ supabase/migrations/
 - ✅ Database schema designed (4 tables + 1 view + 3 functions + 2 triggers)
 - ✅ RLS policies defined for all tables
 - ✅ Migration files created
-- ⏳ Migrations not yet executed in Supabase
+- ✅ Migrations executed in Supabase (2026-04-05)
 - ⏳ Frontend not yet connected to real data (still using mock data)
+- ⏳ Current seed data is for testing — metrics will change for production
 
 ---
 
@@ -690,8 +698,9 @@ export default async function Page() {
 
 1. **Chart Library**: Current chart is a placeholder. Integrate Recharts or similar for production.
 2. **Avatar Images**: Placeholder paths (`/avatars/01.png`) need real images or dynamic generation.
-3. **Mock Data**: Frontend still uses hardcoded mock data. Schema is ready — next step is connecting frontend to Supabase queries.
-4. **Role Security**: Client-side role filtering only. RLS policies are defined but migrations not yet executed. Must run migrations and update frontend to use DB roles.
+3. **Mock Data**: Frontend still uses hardcoded mock data. Schema and migrations are live — next step is connecting frontend to Supabase queries.
+4. **Role Security**: Client-side role filtering only. RLS policies are live in DB. Must update frontend to use `get_user_role()` RPC instead of env var.
+5. **Test Metrics**: Current seed data (businesses, transactions, snapshots) is for testing only. Production will use different metrics and data structures.
 5. **Error Handling**: Add error boundaries and loading states.
 6. **Accessibility**: Ensure ARIA labels and keyboard navigation.
 7. **Hidden Features**: Notifications, search, activity, extra tabs, and sidebar nav items are hidden (not deleted) for v0. Components still exist in codebase.
@@ -797,6 +806,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-03_  
+_Last Updated: 2026-04-05_  
 _Version: 0.4.1_  
-_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Schema (Sprint 1 Complete, Frontend Integration Plan Approved)_
+_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Schema (Sprint 1 Complete, Migrations Executed, Frontend Integration Plan Approved)_
