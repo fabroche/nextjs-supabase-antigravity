@@ -143,5 +143,6 @@ $$ LANGUAGE sql STABLE SECURITY INVOKER;
 -- ==========================================
 CREATE OR REPLACE FUNCTION public.get_user_role()
 RETURNS TEXT AS $$
-  SELECT role FROM public.user_profiles WHERE id = auth.uid();
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+  SELECT role FROM public.user_profiles WHERE id = (select auth.uid());
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = '';

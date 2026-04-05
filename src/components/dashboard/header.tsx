@@ -26,17 +26,10 @@ import { useAuth } from "@/contexts/auth-context"
 
 export function Header() {
   const { user } = useAuth()
-  const { selectedBusiness, setSelectedBusiness, businesses, isAdmin, isLoading } = useBusiness()
+  const { selectedBusiness, selectBusinessById, businesses, isAdmin, isLoading } = useBusiness()
 
   async function handleSignOut() {
     await signOut()
-  }
-
-  function handleBusinessChange(businessId: string) {
-    const business = businesses.find(b => b.id === businessId)
-    if (business) {
-      setSelectedBusiness(business)
-    }
   }
 
   return (
@@ -48,7 +41,7 @@ export function Header() {
       <div className="flex items-center gap-2">
         {/* Business Selector - Only visible for admin users */}
         {!isLoading && isAdmin && selectedBusiness && (
-          <Select value={selectedBusiness.id} onValueChange={handleBusinessChange}>
+          <Select value={selectedBusiness.id} onValueChange={selectBusinessById}>
             <SelectTrigger className="w-[200px]">
               <SelectValue />
             </SelectTrigger>

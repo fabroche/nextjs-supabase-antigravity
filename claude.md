@@ -155,12 +155,12 @@ nextjs-supabase/
 │   ├── lib/
 │   │   ├── auth/
 │   │   │   └── actions.ts        # Server actions for authentication
-│   │   ├── data/
-│   │   │   └── mock-businesses.ts # Mock business data
 │   │   ├── supabase/
 │   │   │   ├── client.ts         # Client-side Supabase client
 │   │   │   ├── server.ts         # Server-side Supabase client
-│   │   │   └── middleware.ts     # Session management
+│   │   │   ├── middleware.ts     # Session management
+│   │   │   ├── types.ts          # TypeScript interfaces for DB tables/views
+│   │   │   └── queries.ts        # Supabase query functions
 │   │   └── utils.ts              # cn() utility for class merging
 │   └── middleware.ts             # Route protection middleware
 ├── public/
@@ -522,7 +522,7 @@ supabase/migrations/
 - ✅ RLS policies defined for all tables
 - ✅ Migration files created
 - ✅ Migrations executed in Supabase (2026-04-05)
-- ⏳ Frontend not yet connected to real data (still using mock data)
+- ✅ Frontend connected to real Supabase data (mock-businesses.ts deleted)
 - ⏳ Current seed data is for testing — metrics will change for production
 
 ---
@@ -698,8 +698,7 @@ export default async function Page() {
 
 1. **Chart Library**: Current chart is a placeholder. Integrate Recharts or similar for production.
 2. **Avatar Images**: Placeholder paths (`/avatars/01.png`) need real images or dynamic generation.
-3. **Mock Data**: Frontend still uses hardcoded mock data. Schema and migrations are live — next step is connecting frontend to Supabase queries.
-4. **Role Security**: Client-side role filtering only. RLS policies are live in DB. Must update frontend to use `get_user_role()` RPC instead of env var.
+3. **Role Security**: Frontend uses `get_user_role()` RPC + RLS policies in DB. `NEXT_PUBLIC_ADMIN_EMAIL` env var is no longer used for role determination.
 5. **Test Metrics**: Current seed data (businesses, transactions, snapshots) is for testing only. Production will use different metrics and data structures.
 5. **Error Handling**: Add error boundaries and loading states.
 6. **Accessibility**: Ensure ARIA labels and keyboard navigation.
@@ -807,5 +806,5 @@ className = "bg-destructive text-destructive-foreground";
 ---
 
 _Last Updated: 2026-04-05_  
-_Version: 0.4.1_  
-_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Schema (Sprint 1 Complete, Migrations Executed, Frontend Integration Plan Approved)_
+_Version: 0.5.0_  
+_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Live + Frontend Connected to Supabase_
