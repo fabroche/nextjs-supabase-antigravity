@@ -13,6 +13,20 @@
 >
 > **DO NOT SKIP THIS STEP!** Documentation is as important as the code itself.
 
+> **🛠️ ALWAYS USE AGENT SKILLS FOR BEST PRACTICES 🛠️**
+>
+> This project has installed agent skills in `.agents/skills/`. **You MUST consult the relevant skill before writing or reviewing code:**
+>
+> | Skill | When to use |
+> |-------|-------------|
+> | `supabase-postgres-best-practices` | Any SQL query, migration, RLS policy, schema change, or Supabase configuration |
+> | `vercel-react-best-practices` | Any React component, hook, server component, data fetching, or performance optimization |
+> | `web-design-guidelines` | Any UI layout, accessibility, responsive design, or UX decision |
+> | `ui-ux-pro-max` | Color palettes, font pairings, component styling, design system choices |
+> | `remotion-best-practices` | Any video generation or Remotion-related work |
+>
+> **DO NOT write code from memory alone — always reference the skill files to ensure we follow current best practices.**
+
 ---
 
 ## Project Overview
