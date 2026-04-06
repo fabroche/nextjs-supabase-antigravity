@@ -523,6 +523,7 @@ supabase/migrations/
 - ✅ Migration files created
 - ✅ Migrations executed in Supabase (2026-04-05)
 - ✅ Frontend connected to real Supabase data (mock-businesses.ts deleted)
+- ✅ Hotfix: `business_metrics` view — added upper bound to current-month date filters (2026-04-05)
 - ⏳ Current seed data is for testing — metrics will change for production
 
 ---
@@ -558,23 +559,12 @@ npx shadcn@latest add select
 
 ### Immediate Priorities
 
-1. **Execute Migrations**
-
-   - Run `001_foundation.sql` through `004_seed_data.sql` in Supabase SQL Editor
-   - Verify tables, RLS policies, and triggers are working
-
-2. **Data Integration**
-
-   - Connect metric cards to real Supabase data (replace mock-businesses.ts)
-   - Update `BusinessContext` to fetch from `businesses` table + `business_metrics` view
-   - Update role check to use `get_user_role()` RPC instead of env var
-   - Add loading states
-
-3. **Advanced Charting**
-
-   - Install Recharts: `npm install recharts`
-   - Replace placeholder chart with real visualizations
-   - Add interactive features
+1. **Sprint 2 — Reports Tab** (next up)
+   - Install shadcn calendar + popover, papaparse
+   - Create `fetchTransactionsByDateRange()` query (no mocks needed — data is live)
+   - Build components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
+   - Re-enable "Reportes" tab in `page.tsx`
+   - Detailed plan in `SPRINT-2-PLAN.md`
 
 ### Completed Features
 
@@ -618,6 +608,12 @@ npx shadcn@latest add select
   - Recent activity section hidden (pending redesign)
   - Chart expanded to full width
 
+- ✅ **Advanced Charting** (v0.5.0)
+  - Recharts integrated (`npm install recharts`)
+  - `OverviewChart` rewritten with `<BarChart>`, `<XAxis>`, `<YAxis>`, `<Tooltip>`
+  - Responsive container, theme-aware tooltip, currency formatting on Y axis
+  - Zero changes needed in queries, context, or page.tsx (plug and play)
+
 - ✅ **Database Schema** (v0.4.1)
   - 4 tables: `user_profiles`, `businesses`, `transactions`, `business_metrics_snapshot`
   - `business_metrics` view for derived revenue/sales metrics
@@ -635,19 +631,7 @@ npx shadcn@latest add select
 - Re-enable "Reportes" tab in dashboard
 - Components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
 - Dependencies to install: shadcn calendar, popover, papaparse
-
-### Next Up — Frontend Data Integration (plan approved)
-
-> Plan saved in `.claude/plans/bright-flowing-river.md`
-
-Connect frontend to real Supabase data (client-side fetching):
-1. Execute 4 SQL migrations in Supabase SQL Editor
-2. Create `src/lib/supabase/types.ts` — TypeScript interfaces for DB tables
-3. Create `src/lib/supabase/queries.ts` — Query functions (fetchBusinesses, fetchBusinessMetrics, fetchChartData, etc.)
-4. Rewrite `src/contexts/business-context.tsx` — Replace mock imports with Supabase queries
-5. Adapt `src/app/page.tsx` — Add `isLoadingData` state
-6. Delete `src/lib/data/mock-businesses.ts`
-7. Update docs
+- **Update from analysis (2026-04-06)**: No mock data needed — `transactions` table is live. Only need a new `fetchTransactionsByDateRange()` query. `DbTransaction` type already matches the `ReportRow` interface from the plan.
 
 ### Future Sprints (Backlog)
 
@@ -696,7 +680,7 @@ export default async function Page() {
 
 ## Known Issues & Considerations
 
-1. **Chart Library**: Current chart is a placeholder. Integrate Recharts or similar for production.
+1. ~~**Chart Library**~~: Recharts integrated (v0.5.0). Consider adding more chart types (line, area) in future sprints.
 2. **Avatar Images**: Placeholder paths (`/avatars/01.png`) need real images or dynamic generation.
 3. **Role Security**: Frontend uses `get_user_role()` RPC + RLS policies in DB. `NEXT_PUBLIC_ADMIN_EMAIL` env var is no longer used for role determination.
 5. **Test Metrics**: Current seed data (businesses, transactions, snapshots) is for testing only. Production will use different metrics and data structures.
@@ -737,6 +721,7 @@ export default async function Page() {
 - shadcn/ui components (Radix UI)
 - Tailwind CSS v4
 - Lucide icons
+- Recharts (data visualization)
 
 ### Development
 
@@ -805,6 +790,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-05_  
-_Version: 0.5.0_  
-_Status: v0 Release — Dashboard + Auth + Roles + UI Cleanup + DB Live + Frontend Connected to Supabase_
+_Last Updated: 2026-04-06_  
+_Version: 0.5.1_  
+_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Frontend Connected to Supabase_

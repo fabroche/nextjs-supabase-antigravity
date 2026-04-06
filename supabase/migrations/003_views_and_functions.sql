@@ -18,6 +18,7 @@ SELECT
   COALESCE(SUM(t.amount) FILTER (
     WHERE t.status = 'success'
       AND t.created_at >= date_trunc('month', now())
+      AND t.created_at < date_trunc('month', now()) + INTERVAL '1 month'
   ), 0) AS total_revenue,
 
   -- Previous month revenue
@@ -39,6 +40,7 @@ SELECT
         COALESCE(SUM(t.amount) FILTER (
           WHERE t.status = 'success'
             AND t.created_at >= date_trunc('month', now())
+            AND t.created_at < date_trunc('month', now()) + INTERVAL '1 month'
         ), 0)
         -
         COALESCE(SUM(t.amount) FILTER (
@@ -61,6 +63,7 @@ SELECT
   COUNT(*) FILTER (
     WHERE t.status = 'success'
       AND t.created_at >= date_trunc('month', now())
+      AND t.created_at < date_trunc('month', now()) + INTERVAL '1 month'
   ) AS sales,
 
   -- Previous month sales count
@@ -82,6 +85,7 @@ SELECT
         COUNT(*) FILTER (
           WHERE t.status = 'success'
             AND t.created_at >= date_trunc('month', now())
+            AND t.created_at < date_trunc('month', now()) + INTERVAL '1 month'
         )
         -
         COUNT(*) FILTER (

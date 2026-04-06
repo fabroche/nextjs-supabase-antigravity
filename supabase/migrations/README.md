@@ -97,7 +97,7 @@ SELECT COUNT(*) FROM public.business_metrics_snapshot;  -- Expected: 6
 
 | View | Purpose |
 |------|---------|
-| `business_metrics` | Aggregates transactions to calculate `total_revenue`, `revenue_change`, `sales`, `sales_change` per business (current month vs previous month) |
+| `business_metrics` | Aggregates transactions to calculate `total_revenue`, `revenue_change`, `sales`, `sales_change` per business (current month vs previous month). Uses bounded date ranges (`>= month_start AND < next_month_start`) to avoid including future data. |
 
 ### Functions
 
@@ -156,6 +156,7 @@ The admin user is configured as `genzai.cloud@gmail.com` in both:
 | 2026-04-05 | 002_business_data.sql | Executed | |
 | 2026-04-05 | 003_views_and_functions.sql | Executed | |
 | 2026-04-05 | 004_seed_data.sql | Executed | Required pre-seed INSERT for existing users without profiles |
+| 2026-04-05 | Hotfix: business_metrics view | Applied in SQL Editor | Added upper bound `< date_trunc('month', now()) + INTERVAL '1 month'` to all current-month FILTER clauses. Bug: future months' transactions were included in current month totals. Migration file `003` updated to match. |
 
 ---
 

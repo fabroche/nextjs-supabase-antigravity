@@ -2,8 +2,9 @@
 
 > **Estado**: Pendiente  
 > **Fecha de creación**: 2026-04-01  
-> **Dependencia**: Sprint 1 debe estar mergeado en `main`  
-> **Versión objetivo**: 0.5.0
+> **Dependencia**: Sprint 1 debe estar mergeado en `main` ✅  
+> **Versión objetivo**: 0.5.0  
+> **Actualización 2026-04-06**: No se necesitan datos mock — la DB está live con `transactions` reales. `DbTransaction` ya tiene los campos que el plan define como `ReportRow`. Solo crear `fetchTransactionsByDateRange()` query.
 
 ---
 

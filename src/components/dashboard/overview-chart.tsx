@@ -1,5 +1,6 @@
 "use client"
 
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface ChartData {
@@ -12,39 +13,52 @@ interface OverviewChartProps {
 }
 
 export function OverviewChart({ data }: OverviewChartProps) {
-  const maxValue = Math.max(...data.map((d) => d.value))
-  const chartHeight = 280 // Height in pixels for the chart area
-
   return (
     <Card>
       <CardHeader>
         <CardTitle>Resumen</CardTitle>
         <CardDescription>
-          Métricas de los últimos 6 meses
+          Ingresos de los últimos 6 meses
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] flex items-end justify-between gap-2">
-          {data.map((item) => {
-            const barHeight = (item.value / maxValue) * chartHeight
-            return (
-              <div key={item.month} className="flex-1 flex flex-col items-center gap-2">
-                <div 
-                  className="w-full bg-primary/20 rounded-t-md relative transition-all duration-500 ease-in-out" 
-                  style={{ height: `${barHeight}px`, minHeight: '20px' }}
-                >
-                  <div className="absolute inset-0 bg-primary rounded-t-md hover:bg-primary/80 transition-colors" />
-                </div>
-                <span className="text-xs text-muted-foreground">{item.month}</span>
-              </div>
-            )
-          })}
-        </div>
-        <div className="mt-4 text-center text-sm text-muted-foreground">
-          Integra una librería de gráficos como Recharts para visualizaciones avanzadas
+        <div className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+              <XAxis
+                dataKey="month"
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+              />
+              <Tooltip
+                cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                }}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+                formatter={(value) => [`$${Number(value).toLocaleString()}`, "Ingresos"]}
+              />
+              <Bar
+                dataKey="value"
+                fill="hsl(var(--primary))"
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </CardContent>
     </Card>
   )
 }
-
