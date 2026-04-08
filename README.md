@@ -24,6 +24,7 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 - 👤 **User Management** - Centralized auth state with AuthContext
 - ⚡ **Fast & Optimized** - Server-side rendering with Next.js 16
 - 🎯 **TypeScript** - Full type safety throughout the application
+- 📊 **Reports Tab** - Transaction reports with date range picker and CSV export
 
 ### Current Dashboard Components
 
@@ -202,6 +203,10 @@ nextjs-supabase/
 │   │   │   ├── metric-card.tsx
 │   │   │   ├── overview-chart.tsx  # Animated chart
 │   │   │   └── recent-activity.tsx
+│   │   ├── reports/           # Reports tab components
+│   │   │   ├── date-range-picker.tsx
+│   │   │   ├── report-table.tsx
+│   │   │   └── export-button.tsx
 │   │   └── ui/                # shadcn/ui components
 │   ├── contexts/              # React contexts
 │   │   ├── auth-context.tsx   # Authentication state
@@ -407,6 +412,8 @@ Make sure to add these in your hosting platform:
 - **[Tailwind CSS v4](https://tailwindcss.com/)** - Utility-first CSS
 - **[Radix UI](https://www.radix-ui.com/)** - Headless UI primitives
 - **[Lucide Icons](https://lucide.dev/)** - Icon library
+- **[Recharts](https://recharts.org/)** - Data visualization
+- **[PapaParse](https://www.papaparse.com/)** - CSV export
 
 ---
 

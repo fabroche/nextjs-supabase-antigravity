@@ -1,13 +1,19 @@
 "use client"
 
+import { useState, useCallback, useEffect } from "react"
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { OverviewChart } from "@/components/dashboard/overview-chart"
+import { DateRangePicker } from "@/components/reports/date-range-picker"
+import { ReportTable } from "@/components/reports/report-table"
+import { ExportButton } from "@/components/reports/export-button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { useBusiness } from "@/contexts/business-context"
+import { fetchTransactionsByDateRange } from "@/lib/supabase/queries"
+import type { DbTransaction } from "@/lib/supabase/types"
 
 function MetricCardSkeleton() {
   return (
@@ -35,6 +41,30 @@ function ChartSkeleton() {
 
 export default function DashboardPage() {
   const { selectedBusiness, isLoading, isLoadingData, error } = useBusiness()
+  const [reportData, setReportData] = useState<DbTransaction[]>([])
+  const [isLoadingReport, setIsLoadingReport] = useState(false)
+  const [reportRange, setReportRange] = useState<{ from: Date; to: Date } | undefined>()
+
+  const handleDateRangeChange = useCallback(async (from: Date, to: Date) => {
+    if (!selectedBusiness) return
+    setReportRange({ from, to })
+    setIsLoadingReport(true)
+    try {
+      const data = await fetchTransactionsByDateRange(selectedBusiness.id, from, to)
+      setReportData(data)
+    } catch (err) {
+      console.error('Error fetching report:', err)
+      setReportData([])
+    } finally {
+      setIsLoadingReport(false)
+    }
+  }, [selectedBusiness])
+
+  // Reset report when selected business changes
+  useEffect(() => {
+    setReportData([])
+    setReportRange(undefined)
+  }, [selectedBusiness?.id])
 
   // Initial loading (auth + business list)
   if (isLoading || !selectedBusiness) {
@@ -76,6 +106,7 @@ export default function DashboardPage() {
           <Tabs defaultValue="overview" className="space-y-4">
             <TabsList>
               <TabsTrigger value="overview">Resumen</TabsTrigger>
+              <TabsTrigger value="reports">Reportes</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4">
@@ -126,6 +157,23 @@ export default function DashboardPage() {
               ) : (
                 <OverviewChart data={selectedBusiness.chartData} />
               )}
+            </TabsContent>
+
+            <TabsContent value="reports" className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <DateRangePicker onDateRangeChange={handleDateRangeChange} />
+                <ExportButton
+                  data={reportData}
+                  businessName={selectedBusiness.name}
+                  from={reportRange?.from}
+                  to={reportRange?.to}
+                />
+              </div>
+              <ReportTable
+                data={reportData}
+                isLoading={isLoadingReport}
+                currency={selectedBusiness.currency}
+              />
             </TabsContent>
 
           </Tabs>
