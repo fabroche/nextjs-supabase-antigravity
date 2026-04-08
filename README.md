@@ -25,6 +25,9 @@ A modern, responsive metrics dashboard built with Next.js 16, Supabase, and shad
 - ⚡ **Fast & Optimized** - Server-side rendering with Next.js 16
 - 🎯 **TypeScript** - Full type safety throughout the application
 - 📊 **Reports Tab** - Transaction reports with date range picker and CSV export
+- 🔔 **Real-time Notifications** - Live notification bell with unread badge via Supabase Realtime
+- 🌐 **Webhook Integration** - Receive events from Telegram, Dokploy, Notion, N8N
+- 📡 **Activity Feed** - Live feed of all external events in the dashboard
 
 ### Current Dashboard Components
 
@@ -203,6 +206,9 @@ nextjs-supabase/
 │   │   │   ├── metric-card.tsx
 │   │   │   ├── overview-chart.tsx  # Animated chart
 │   │   │   └── recent-activity.tsx
+│   │   ├── notifications/     # Notification system
+│   │   │   ├── notification-bell.tsx
+│   │   │   └── notification-item.tsx
 │   │   ├── reports/           # Reports tab components
 │   │   │   ├── date-range-picker.tsx
 │   │   │   ├── report-table.tsx

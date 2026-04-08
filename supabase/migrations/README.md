@@ -16,6 +16,8 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 2 | `002_business_data.sql` | `businesses`, `transactions`, `business_metrics_snapshot` tables with RLS policies and indexes |
 | 3 | `003_views_and_functions.sql` | `business_metrics` view, `get_monthly_chart_data` and `get_user_role` RPC functions |
 | 4 | `004_seed_data.sql` | Promotes admin, inserts 3 test businesses, transactions (recent + historical), and metric snapshots |
+| 5 | `005_notifications.sql` | `activity_feed`, `notifications` tables, RLS policies, Supabase Realtime publication |
+| 6 | `006_webhook_infrastructure.sql` | `webhook_sources`, `webhook_dead_letters` tables, seed 4 sources, `telegram_id`/`notion_person_id` columns on `user_profiles` |
 
 ---
 
@@ -157,7 +159,9 @@ The admin user is configured as `genzai.cloud@gmail.com` in both:
 | 2026-04-05 | 003_views_and_functions.sql | Executed | |
 | 2026-04-05 | 004_seed_data.sql | Executed | Required pre-seed INSERT for existing users without profiles |
 | 2026-04-05 | Hotfix: business_metrics view | Applied in SQL Editor | Added upper bound `< date_trunc('month', now()) + INTERVAL '1 month'` to all current-month FILTER clauses. Bug: future months' transactions were included in current month totals. Migration file `003` updated to match. |
+| 2026-04-08 | 005_notifications.sql | Executed | activity_feed + notifications tables, RLS, Realtime publication verified |
+| 2026-04-08 | 006_webhook_infrastructure.sql | Executed | webhook_sources + dead_letters, 4 sources seeded, user_profiles extended |
 
 ---
 
-_Last Updated: 2026-04-05_
+_Last Updated: 2026-04-08_

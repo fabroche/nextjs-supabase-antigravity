@@ -23,6 +23,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { signOut } from "@/lib/auth/actions"
 import { useBusiness } from "@/contexts/business-context"
 import { useAuth } from "@/contexts/auth-context"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 export function Header() {
   const { user } = useAuth()
@@ -56,7 +57,8 @@ export function Header() {
         )}
 
         <ThemeToggle />
-        
+        <NotificationBell />
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
