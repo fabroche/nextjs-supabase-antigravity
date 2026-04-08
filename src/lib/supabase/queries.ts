@@ -88,12 +88,14 @@ export async function fetchTransactionsByDateRange(
   to: Date
 ): Promise<DbTransaction[]> {
   const supabase = createClient()
+  const endOfDay = new Date(to)
+  endOfDay.setHours(23, 59, 59, 999)
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
     .eq('business_id', businessId)
     .gte('created_at', from.toISOString())
-    .lte('created_at', to.toISOString())
+    .lte('created_at', endOfDay.toISOString())
     .order('created_at', { ascending: false })
   if (error) throw error
   return data || []
