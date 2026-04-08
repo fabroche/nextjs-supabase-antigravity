@@ -53,6 +53,35 @@ export interface DbChartData {
   value: number
 }
 
+// Table: activity_feed
+export interface DbActivityFeed {
+  id: string
+  source: string
+  event_type: string
+  actor: string
+  action: string
+  description: string
+  channel: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+// Table: notifications
+export interface DbNotification {
+  id: string
+  user_id: string
+  source: string
+  event_type: string
+  actor: string
+  action: string
+  description: string
+  channel: string | null
+  metadata: Record<string, unknown>
+  read: boolean
+  read_at: string | null
+  created_at: string
+}
+
 // Composite type used by the frontend
 // Maintains the same shape as the old mock Business interface
 // so MetricCard, OverviewChart, and Header work without changes

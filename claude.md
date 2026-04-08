@@ -34,9 +34,9 @@
 **Project Name**: Next.js Supabase Dashboard  
 **Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: v0.6.0 — Reports tab live, DB connected, Recharts integrated  
-**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.6.0 - completed), `SPRINT-3-PLAN.md` (pending)  
-**Next Step**: Sprint 3 — Real-time notifications with Supabase subscriptions
+**Development Status**: v0.7.0 — Notifications + Webhooks + Realtime live  
+**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.6.0 - completed), `SPRINT-3-PLAN.md` (v0.7.0 - Fases 1-3 completed)  
+**Next Step**: Sprint 3 Fases 4-5 (more normalizers, settings panel) or Sprint 4 (ticket system)
 
 ---
 
@@ -145,7 +145,11 @@ nextjs-supabase/
 │   │   │   ├── header.tsx        # Top bar with business selector
 │   │   │   ├── metric-card.tsx   # Reusable metric display
 │   │   │   ├── overview-chart.tsx # Animated chart visualization
-│   │   │   └── recent-activity.tsx # Activity table
+│   │   │   ├── activity-feed.tsx  # Real-time activity feed
+│   │   │   └── recent-activity.tsx # Activity table (legacy, unused)
+│   │   ├── notifications/        # Notification system
+│   │   │   ├── notification-bell.tsx  # Bell icon with badge in header
+│   │   │   └── notification-item.tsx  # Individual notification row
 │   │   ├── reports/              # Reports tab components
 │   │   │   ├── date-range-picker.tsx # Calendar range picker with presets
 │   │   │   ├── report-table.tsx     # Transaction table with summary
@@ -167,6 +171,9 @@ nextjs-supabase/
 │   │       ├── sheet.tsx
 │   │       ├── table.tsx
 │   │       └── tabs.tsx
+│   ├── hooks/
+│   │   ├── use-activity-feed.ts   # Supabase Realtime hook for activity feed
+│   │   └── use-notifications.ts   # Supabase Realtime hook for notifications
 │   ├── contexts/
 │   │   ├── auth-context.tsx    # Centralized authentication state
 │   │   └── business-context.tsx  # Business state management
@@ -174,6 +181,7 @@ nextjs-supabase/
 │   │   ├── auth/
 │   │   │   └── actions.ts        # Server actions for authentication
 │   │   ├── supabase/
+│   │   │   ├── admin.ts          # Service role client (backend only)
 │   │   │   ├── client.ts         # Client-side Supabase client
 │   │   │   ├── server.ts         # Server-side Supabase client
 │   │   │   ├── middleware.ts     # Session management
@@ -182,6 +190,15 @@ nextjs-supabase/
 │   │   ├── utils/
 │   │   │   └── export.ts          # CSV export utility (PapaParse)
 │   │   └── utils.ts              # cn() utility for class merging
+│   ├── app/
+│   │   └── api/
+│   │       └── webhooks/
+│   │           ├── [source]/
+│   │           │   └── route.ts      # Dynamic webhook endpoint
+│   │           └── _lib/
+│   │               ├── types.ts      # NormalizedEvent interface
+│   │               ├── validators.ts # HMAC signature validation
+│   │               └── normalizers.ts # Payload normalizers per source
 │   └── middleware.ts             # Route protection middleware
 ├── public/
 │   └── assets/
@@ -191,7 +208,9 @@ nextjs-supabase/
 │       ├── 001_foundation.sql         # Functions, user_profiles, triggers
 │       ├── 002_business_data.sql      # businesses, transactions, snapshots
 │       ├── 003_views_and_functions.sql # Views and RPC functions
-│       └── 004_seed_data.sql          # Initial seed data
+│       ├── 004_seed_data.sql          # Initial seed data
+│       ├── 005_notifications.sql      # activity_feed, notifications, Realtime
+│       └── 006_webhook_infrastructure.sql # webhook_sources, dead_letters
 ├── components.json               # shadcn/ui configuration
 ├── tsconfig.json                 # TypeScript configuration
 ├── .env.local                    # Environment variables (gitignored)
@@ -253,6 +272,9 @@ Required in `.env.local`:
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_ADMIN_EMAIL=admin@example.com
+SERVICE_ROLE_KEY=your-service-role-key          # Backend only — never expose to client
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+TELEGRAM_WEBHOOK_SECRET=your-webhook-secret     # Also stored in webhook_sources table
 ```
 
 **Current Setup**: Self-hosted Supabase instance at `https://supabase.genzai.cloud`
@@ -453,7 +475,34 @@ Features:
 - "Reportes" tab added alongside "Resumen"
 - Report state resets when selected business changes (`useEffect` on `selectedBusiness.id`)
 
-#### 9. Animated Chart Component
+#### 9. Real-time Notifications & Webhooks (Sprint 3 - v0.7.0)
+
+**Webhook Endpoint** (`app/api/webhooks/[source]/route.ts`):
+- Dynamic route accepting POST from any configured source
+- Validates signature via `validators.ts` (HMAC for Dokploy/Notion, direct comparison for Telegram/N8N)
+- Fire-and-forget: responds 200 immediately, processes in background
+- Failed webhooks saved to `webhook_dead_letters` table
+
+**Normalizers** (`app/api/webhooks/_lib/normalizers.ts`):
+- Telegram: handles `message.new` and `message.reply` events
+- Resolves `telegram_id` → Supabase `user_id` for personal notifications
+- Stubs ready for Dokploy, Notion, N8N
+
+**Realtime Hooks** (`hooks/`):
+- `useActivityFeed` — subscribes to `activity_feed` table INSERTs via Supabase Realtime
+- `useNotifications` — subscribes to user-filtered `notifications` INSERTs, manages unread count
+
+**NotificationBell** (`components/notifications/notification-bell.tsx`):
+- Bell icon with red unread badge (shows count, max "9+")
+- Dropdown with notification list, "mark all as read" action
+- Each item shows source icon, description, relative time
+
+**ActivityFeed** (`components/dashboard/activity-feed.tsx`):
+- Live feed of all webhook events in the dashboard
+- Connection status indicator (Wifi icon: green = connected)
+- Source icons per platform
+
+#### 10. Animated Chart Component
 
 **Overview Chart** (`components/dashboard/overview-chart.tsx`):
 
@@ -540,6 +589,10 @@ import { createServerClient } from "@supabase/ssr";
 | `businesses` | Business entities (1 user = N businesses) | `id`, `owner_id` (FK), `name`, `currency` |
 | `transactions` | Financial transactions — all metrics derived from this | `id`, `business_id` (FK), `customer_name`, `customer_email`, `amount`, `status`, `concept`, `category` |
 | `business_metrics_snapshot` | Daily snapshots for active users | `id`, `business_id` (FK), `active_users`, `active_now`, `snapshot_date` |
+| `activity_feed` | All webhook events from external sources | `id`, `source`, `event_type`, `actor`, `action`, `description`, `channel` |
+| `notifications` | Personal notifications per user | `id`, `user_id` (FK), `source`, `action`, `description`, `read`, `read_at` |
+| `webhook_sources` | Webhook source config and secrets | `id`, `source`, `secret`, `is_active`, `config` |
+| `webhook_dead_letters` | Failed webhook processing queue | `id`, `source`, `payload`, `error`, `retries`, `resolved` |
 
 **View**: `business_metrics` — Aggregates `transactions` to derive `total_revenue`, `revenue_change`, `sales`, `sales_change` per business (current vs previous month).
 
@@ -554,7 +607,9 @@ import { createServerClient } from "@supabase/ssr";
 
 **RLS Pattern**: All tables have RLS enabled. Negocio users access only their own data (via `owner_id` or `business_id` chain). Admin users access everything via `is_admin()`.
 
-**Indexes**: Composite index on `transactions(business_id, status, created_at DESC)` covers the main metrics/chart queries.
+**Realtime**: `activity_feed` and `notifications` tables are added to `supabase_realtime` publication for live updates.
+
+**Indexes**: Composite index on `transactions(business_id, status, created_at DESC)` covers the main metrics/chart queries. Partial index on `notifications(user_id, read) WHERE read = false` for unread count.
 
 ### Migration Files
 
@@ -614,11 +669,11 @@ npx shadcn@latest add select
 
 ### Immediate Priorities
 
-1. **Sprint 3 — Real-time Notifications** (next up)
-   - Supabase Realtime subscriptions for transactions
-   - Notification bell + dropdown in header
-   - Webhook integration for external events
-   - Detailed plan in `SPRINT-3-PLAN.md`
+1. **Sprint 3 — Remaining phases** (next up)
+   - Add normalizers for Dokploy, Notion, N8N (Fase 4)
+   - Settings panel for users to link telegram_id / notion_person_id (Fase 5)
+   - Dead letter admin view (Fase 5)
+   - Register Telegram webhook with BotFather + test end-to-end
 
 ### Completed Features
 
@@ -676,6 +731,21 @@ npx shadcn@latest add select
   - Auto-profile creation trigger on signup
   - Seed data matching current mock businesses
   - Migration files in `supabase/migrations/`
+
+### Sprint 3 — Completed (v0.7.0 — Fases 1-3)
+
+- ✅ **Real-time Notifications** (Sprint 3)
+  - Webhook endpoint `/api/webhooks/[source]` with HMAC validation
+  - Telegram normalizer (message.new, message.reply)
+  - Fire-and-forget processing with dead letter queue
+  - Supabase Realtime hooks (`useActivityFeed`, `useNotifications`)
+  - NotificationBell in header with unread badge
+  - ActivityFeed component in dashboard (live Realtime connection indicator)
+  - Mark as read / mark all as read
+  - 2 new migrations: `005_notifications.sql`, `006_webhook_infrastructure.sql`
+  - 6 new tables: `activity_feed`, `notifications`, `webhook_sources`, `webhook_dead_letters`
+  - `user_profiles` extended with `telegram_id`, `notion_person_id`
+  - Service role admin client (`lib/supabase/admin.ts`)
 
 ### Sprint 2 — Completed (v0.6.0)
 
@@ -851,5 +921,5 @@ className = "bg-destructive text-destructive-foreground";
 ---
 
 _Last Updated: 2026-04-08_  
-_Version: 0.6.0_  
-_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Reports Tab + CSV Export_
+_Version: 0.7.0_  
+_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Reports + Notifications + Webhooks + Realtime_

@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { OverviewChart } from "@/components/dashboard/overview-chart"
+import { ActivityFeed } from "@/components/dashboard/activity-feed"
 import { DateRangePicker } from "@/components/reports/date-range-picker"
 import { ReportTable } from "@/components/reports/report-table"
 import { ExportButton } from "@/components/reports/export-button"
@@ -157,6 +158,9 @@ export default function DashboardPage() {
               ) : (
                 <OverviewChart data={selectedBusiness.chartData} />
               )}
+
+              {/* Activity Feed */}
+              <ActivityFeed />
             </TabsContent>
 
             <TabsContent value="reports" className="space-y-4">

@@ -5,6 +5,8 @@ import type {
   DbMetricsSnapshot,
   DbTransaction,
   DbChartData,
+  DbActivityFeed,
+  DbNotification,
 } from './types'
 
 // Get the authenticated user's role ('admin' | 'negocio')
@@ -99,4 +101,50 @@ export async function fetchTransactionsByDateRange(
     .order('created_at', { ascending: false })
   if (error) throw error
   return data || []
+}
+
+// Get recent activity feed events
+export async function fetchActivityFeed(limit = 50): Promise<DbActivityFeed[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('activity_feed')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+// Get notifications for a user
+export async function fetchNotifications(userId: string, limit = 30): Promise<DbNotification[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data || []
+}
+
+// Mark a single notification as read
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true, read_at: new Date().toISOString() })
+    .eq('id', notificationId)
+  if (error) throw error
+}
+
+// Mark all notifications as read for a user
+export async function markAllNotificationsRead(userId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true, read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('read', false)
+  if (error) throw error
 }
