@@ -34,9 +34,9 @@
 **Project Name**: Next.js Supabase Dashboard  
 **Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: v0 release — cleaned UI, role-based access, mock data, DB schema ready  
-**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.5.0 - pending)  
-**Next Step**: Execute migrations in Supabase, then connect frontend to real data (plan approved, see below)
+**Development Status**: v0.6.0 — Reports tab live, DB connected, Recharts integrated  
+**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.6.0 - completed), `SPRINT-3-PLAN.md` (pending)  
+**Next Step**: Sprint 3 — Real-time notifications with Supabase subscriptions
 
 ---
 
@@ -146,6 +146,10 @@ nextjs-supabase/
 │   │   │   ├── metric-card.tsx   # Reusable metric display
 │   │   │   ├── overview-chart.tsx # Animated chart visualization
 │   │   │   └── recent-activity.tsx # Activity table
+│   │   ├── reports/              # Reports tab components
+│   │   │   ├── date-range-picker.tsx # Calendar range picker with presets
+│   │   │   ├── report-table.tsx     # Transaction table with summary
+│   │   │   └── export-button.tsx    # CSV export dropdown
 │   │   ├── theme-provider.tsx    # Theme context provider
 │   │   ├── theme-toggle.tsx      # Dark mode toggle
 │   │   └── ui/                   # shadcn/ui components
@@ -175,6 +179,8 @@ nextjs-supabase/
 │   │   │   ├── middleware.ts     # Session management
 │   │   │   ├── types.ts          # TypeScript interfaces for DB tables/views
 │   │   │   └── queries.ts        # Supabase query functions
+│   │   ├── utils/
+│   │   │   └── export.ts          # CSV export utility (PapaParse)
 │   │   └── utils.ts              # cn() utility for class merging
 │   └── middleware.ts             # Route protection middleware
 ├── public/
@@ -190,8 +196,12 @@ nextjs-supabase/
 ├── tsconfig.json                 # TypeScript configuration
 ├── .env.local                    # Environment variables (gitignored)
 ├── package.json                  # Dependencies
+├── BRANCHING-STRATEGY.md        # Reusable branching & commit convention
 ├── SPRINT-1-PLAN.md             # Sprint 1 implementation plan (v0.4.0)
-└── SPRINT-2-PLAN.md             # Sprint 2 implementation plan (v0.5.0)
+├── SPRINT-2-PLAN.md             # Sprint 2 implementation plan (v0.5.0)
+├── SPRINT-2-IMPLEMENTATION.md   # Sprint 2 step-by-step implementation guide
+├── SPRINT-3-PLAN.md             # Sprint 3 plan — real-time notifications
+└── SPRINT-4-PLAN.md             # Sprint 4 plan — ticket system
 ```
 
 ---
@@ -412,7 +422,38 @@ Features:
 - Chart animates smoothly between business data (500ms transition)
 - All changes happen instantly when business is selected
 
-#### 8. Animated Chart Component
+#### 8. Reports Tab (Sprint 2 - v0.6.0)
+
+**Date Range Picker** (`components/reports/date-range-picker.tsx`):
+- Dual-month calendar with `react-day-picker` in Spanish locale
+- Quick presets: last week, last month, last 3 months
+- Popover UI with "Aplicar" button to confirm selection
+- Dates cannot exceed today
+
+**Report Table** (`components/reports/report-table.tsx`):
+- Summary cards: total amount, transaction count, completed, pending/failed
+- Full transaction table: date, concept, category, client, amount, status
+- Status badges with color variants (default/secondary/destructive)
+- Loading and empty states
+
+**Export Button** (`components/reports/export-button.tsx`):
+- Dropdown with CSV export option (extensible for future formats)
+- Disabled when no data or no date range selected
+- Filename format: `reporte-{business}-{from}-{to}.csv`
+
+**CSV Export Utility** (`lib/utils/export.ts`):
+- Uses PapaParse to generate CSV from `DbTransaction[]`
+- Columns: Fecha, Concepto, Categoria, Monto, Estado, Cliente, Email
+- Browser download via Blob + object URL
+
+**Query** (`lib/supabase/queries.ts`):
+- `fetchTransactionsByDateRange(businessId, from, to)` — filters by `created_at` range, ordered descending
+
+**Integration** (`app/page.tsx`):
+- "Reportes" tab added alongside "Resumen"
+- Report state resets when selected business changes (`useEffect` on `selectedBusiness.id`)
+
+#### 9. Animated Chart Component
 
 **Overview Chart** (`components/dashboard/overview-chart.tsx`):
 
@@ -573,12 +614,11 @@ npx shadcn@latest add select
 
 ### Immediate Priorities
 
-1. **Sprint 2 — Reports Tab** (next up)
-   - Install shadcn calendar + popover, papaparse
-   - Create `fetchTransactionsByDateRange()` query (no mocks needed — data is live)
-   - Build components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
-   - Re-enable "Reportes" tab in `page.tsx`
-   - Detailed plan in `SPRINT-2-PLAN.md`
+1. **Sprint 3 — Real-time Notifications** (next up)
+   - Supabase Realtime subscriptions for transactions
+   - Notification bell + dropdown in header
+   - Webhook integration for external events
+   - Detailed plan in `SPRINT-3-PLAN.md`
 
 ### Completed Features
 
@@ -637,15 +677,18 @@ npx shadcn@latest add select
   - Seed data matching current mock businesses
   - Migration files in `supabase/migrations/`
 
-### Sprint 2 — Planned (v0.5.0)
+### Sprint 2 — Completed (v0.6.0)
 
-> Detailed plan in `SPRINT-2-PLAN.md`
-
-- **Reports Tab**: Date range picker + report table + CSV/Excel export
-- Re-enable "Reportes" tab in dashboard
-- Components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
-- Dependencies to install: shadcn calendar, popover, papaparse
-- **Update from analysis (2026-04-06)**: No mock data needed — `transactions` table is live. Only need a new `fetchTransactionsByDateRange()` query. `DbTransaction` type already matches the `ReportRow` interface from the plan.
+- ✅ **Reports Tab** (Sprint 2)
+  - Date range picker with calendar (dual month, Spanish locale) and quick presets
+  - Transaction report table with summary cards (total, count, completed, pending/failed)
+  - CSV export via PapaParse (filename includes business name + date range)
+  - "Reportes" tab re-enabled alongside "Resumen"
+  - Report state resets when switching businesses
+  - New query: `fetchTransactionsByDateRange()` in `queries.ts`
+  - New components: `date-range-picker.tsx`, `report-table.tsx`, `export-button.tsx`
+  - New utility: `lib/utils/export.ts`
+  - Dependencies added: shadcn calendar, popover, papaparse, date-fns, react-day-picker
 
 ### Future Sprints (Backlog)
 
@@ -736,6 +779,9 @@ export default async function Page() {
 - Tailwind CSS v4
 - Lucide icons
 - Recharts (data visualization)
+- PapaParse (CSV export)
+- date-fns (date formatting)
+- react-day-picker (calendar component)
 
 ### Development
 
@@ -804,6 +850,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-06_  
-_Version: 0.5.1_  
-_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Frontend Connected to Supabase_
+_Last Updated: 2026-04-08_  
+_Version: 0.6.0_  
+_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Reports Tab + CSV Export_

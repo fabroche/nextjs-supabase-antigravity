@@ -80,3 +80,21 @@ export async function fetchRecentTransactions(businessId: string, limit = 5): Pr
   if (error) throw error
   return data || []
 }
+
+// Get transactions filtered by date range for the Reports tab
+export async function fetchTransactionsByDateRange(
+  businessId: string,
+  from: Date,
+  to: Date
+): Promise<DbTransaction[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('business_id', businessId)
+    .gte('created_at', from.toISOString())
+    .lte('created_at', to.toISOString())
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
