@@ -1,140 +1,64 @@
-# 🔧 FIX: Supabase Realtime WebSocket — Conexión Fallida
+# 🔧 FIX: Supabase Realtime — Kong no resuelve el upstream
 
-> **Contexto**: Este documento es para el agente que tiene acceso al servidor Hostinger donde corre Dokploy con Supabase self-hosted.
+> **Contexto**: Documento para el agente con acceso al servidor Hostinger donde corre Dokploy + Supabase self-hosted.
 >
 > **Branch**: `fix/supabase-realtime-websocket`
 >
-> **Fecha**: 2026-04-08
+> **Fecha**: 2026-04-09
 >
-> **Prioridad**: ALTA — Funcionalidad de tiempo real completamente rota en producción
+> **Prioridad**: ALTA — Realtime completamente roto en producción
 
 ---
 
-## 📋 Resumen del Problema
+## 🎯 Causa raíz (ya diagnosticada)
 
-La aplicación Next.js intenta conectarse a **Supabase Realtime** vía WebSocket y falla repetidamente. En la consola del navegador del dashboard en producción, se ven estos errores:
+**Kong no puede resolver vía DNS de Docker el hostname del contenedor del servicio Realtime.** El plugin de upstream del `kong.yml` apunta a un hostname que no existe en la red Docker actual (probablemente porque Dokploy renombró el contenedor o porque la versión de Supabase cambió el nombre del servicio).
 
-```
-WebSocket connection to 'wss://supabase.genzai.cloud/realtime/v1/websocket?apikey=eyJhb...' failed:
-```
-
-Estos errores se repiten cada pocos segundos (el cliente SDK intenta reconectar automáticamente), y en la UI del dashboard el componente "Actividad Reciente" muestra el estado **"Desconectado"** con el icono WifiOff.
-
-### Qué debería funcionar
-
-1. El frontend se suscribe a cambios en 2 tablas PostgreSQL vía Supabase Realtime:
-   - **`activity_feed`** — Feed de eventos de webhooks (Telegram, Dokploy, Notion, N8N)
-   - **`notifications`** — Notificaciones personales por usuario
-
-2. Cuando un webhook inserta un registro en estas tablas, el cambio debería propagarse en tiempo real al navegador vía WebSocket.
-
-3. El componente `ActivityFeed` debería mostrar **"En vivo"** (con icono Wifi verde) cuando la conexión está activa.
+**No es problema de:** la app Next.js, la base de datos, las migraciones, RLS, JWT, headers de WebSocket, ni Traefik. Todo eso está verificado y funciona. El problema es **solo** la línea del `kong.yml` que define el upstream URL para la ruta `/realtime/v1/`.
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 🧪 Evidencia que ya tenemos (no la repitas)
 
-```
-┌─────────────┐     POST /api/webhooks/telegram
-│  Telegram   │ ──────────────────────────────────► ┌──────────────────┐
-│  Bot API    │                                      │  Next.js App     │
-└─────────────┘                                      │  (Dokploy)       │
-                                                     │                  │
-                                                     │  processWebhook()│
-                                                     │       │          │
-                                                     └───────┼──────────┘
-                                                             │ INSERT via service_role
-                                                             ▼
-                                                     ┌──────────────────┐
-                                                     │  Supabase        │
-                                                     │  (Dokploy)       │
-                                                     │                  │
-                                                     │  PostgreSQL      │
-                                                     │  ├─activity_feed │
-                                                     │  └─notifications │
-                                                     │                  │
-                                                     │  Realtime svc ◄──┼─── ❌ WebSocket FALLA AQUÍ
-                                                     │  (puerto 4000)   │
-                                                     └──────────────────┘
-                                                             ▲
-                                                             │ wss://supabase.genzai.cloud/realtime/v1/websocket
-                                                             │
-                                                     ┌───────┴──────────┐
-                                                     │  Navegador       │
-                                                     │  (Dashboard)     │
-                                                     └──────────────────┘
-```
+Estos tests ya están hechos desde el cliente, no hace falta volver a correrlos:
 
-### Componentes Supabase Self-Hosted involucrados
+| Test | Resultado | Conclusión |
+|------|-----------|------------|
+| `curl https://supabase.genzai.cloud/realtime/v1/` (sin apikey) | `401 Unauthorized` desde `Server: kong/2.8.1` con `{"message":"No API key found in request"}` | ✅ Kong tiene la ruta `/realtime/v1/` configurada y exige apikey |
+| `curl https://supabase.genzai.cloud/realtime/v1/?apikey=<ANON_KEY>` | `503 Service Unavailable` con `{"message":"name resolution failed"}` y `Server: kong/2.8.1` | 🔥 **Kong valida la apikey OK pero no puede resolver el hostname del backend Realtime** |
+| `SELECT * FROM pg_publication_tables WHERE pubname='supabase_realtime'` | Devuelve `activity_feed` y `notifications` | ✅ Migración 005 aplicada correctamente |
+| Studio (`https://supabase.genzai.cloud`) responde y permite SQL queries | OK | ✅ Kong + Traefik + DB funcionan para HTTP normal |
 
-| Servicio | Puerto interno | Rol |
-|----------|---------------|-----|
-| `supabase-kong` (API Gateway) | 8000 | Reverse proxy principal, rutea a servicios internos |
-| `supabase-realtime` | 4000 | Servidor WebSocket para Realtime |
-| `supabase-db` | 5432 | PostgreSQL |
+**El error `name resolution failed` viene del propio Kong intentando hacer DNS lookup del upstream**, no del servicio Realtime. Esto es 100% un problema de cómo `kong.yml` referencia al contenedor.
 
 ---
 
-## 🔍 Diagnóstico Paso a Paso
+## 🛠️ Diagnóstico (4 pasos en el servidor)
 
-Ejecuta estas verificaciones **en orden** en el servidor Hostinger:
-
-### Paso 1: Verificar que el contenedor Realtime está corriendo
+### Paso 1 — ¿Cómo se llama realmente el contenedor de Realtime?
 
 ```bash
-docker ps | grep realtime
+docker ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}' | grep -i realtime
 ```
 
-**Esperado**: Debe aparecer un contenedor `supabase-realtime` o similar con status `Up`.
+**Anota el nombre exacto.** Posibles nombres según la versión/instalación:
+- `supabase-realtime`
+- `realtime-dev.supabase-realtime`
+- `supabase-realtime-1`
+- `supabase_realtime_1`
+- `<dokploy-prefix>-realtime-<hash>`
 
-**Si NO aparece**: el servicio Realtime no está desplegado o se cayó. Revisa los logs:
-
-```bash
-docker logs supabase-realtime --tail 100
-```
-
-Y reinicia:
-
-```bash
-docker restart supabase-realtime
-```
+Si **no aparece nada** → el contenedor no está corriendo. Salta a [Solución D](#solución-d).
 
 ---
 
-### Paso 2: Verificar conectividad interna al servicio Realtime
-
-Desde dentro de la red Docker, prueba si Kong puede llegar a Realtime:
+### Paso 2 — ¿Qué hostname tiene configurado Kong para el upstream?
 
 ```bash
-# Entra al contenedor de Kong
-docker exec -it supabase-kong sh
-
-# Prueba conexión HTTP al servicio Realtime
-wget -qO- http://realtime-dev.supabase-realtime:4000/ || echo "FALLO"
+docker exec supabase-kong cat /home/kong/kong.yml | grep -A 10 "name: realtime"
 ```
 
-> **Nota**: El hostname puede variar. Revisa tu `docker-compose.yml` de Supabase para ver el nombre exacto del servicio Realtime.
-
-Alternativa, sin entrar al contenedor:
-
-```bash
-docker exec supabase-kong wget -qO- http://realtime-dev.supabase-realtime:4000/ 2>&1 || echo "FALLO"
-```
-
----
-
-### Paso 3: Verificar la configuración de Kong para Realtime
-
-Kong es el API Gateway de Supabase. Debe tener una ruta configurada para `/realtime/v1/` que apunte al servicio Realtime.
-
-**Opción A** — Verificar en el `kong.yml` (configuración declarativa):
-
-```bash
-# Buscar el archivo kong.yml dentro del contenedor o en el volume montado
-docker exec supabase-kong cat /home/kong/kong.yml | grep -A 20 realtime
-```
-
-**Deberías ver algo como**:
+Busca la sección que define el service de Realtime. Vas a ver algo como:
 
 ```yaml
 - name: realtime-v1
@@ -144,225 +68,179 @@ docker exec supabase-kong cat /home/kong/kong.yml | grep -A 20 realtime
       strip_path: true
       paths:
         - /realtime/v1/
-  plugins:
-    - name: cors
 ```
 
-Si **NO existe esta ruta**, ese es el problema. Necesitas agregarla.
+**Compara el hostname del `url:` con el nombre real del contenedor del Paso 1.** Si no coinciden, **esa es la raíz del problema** y vas a la [Solución A](#solución-a).
 
-**Opción B** — Verificar via Kong Admin API (si está expuesto):
-
-```bash
-curl http://localhost:8001/services | jq '.data[] | select(.name | contains("realtime"))'
-```
+> **Nota**: el archivo puede estar en otra ruta. Alternativas:
+> - `/etc/kong/kong.yml`
+> - `/var/lib/kong/kong.yml`
+> - Ruta montada como volumen: `docker inspect supabase-kong | grep -i kong.yml`
 
 ---
 
-### Paso 4: Verificar configuración de WebSocket en Kong
-
-Kong debe pasar los headers de WebSocket correctamente. Verifica que NO haya plugins que bloqueen WebSocket en la ruta de Realtime.
+### Paso 3 — ¿Están Kong y Realtime en la misma red Docker?
 
 ```bash
-docker exec supabase-kong cat /home/kong/kong.yml | grep -B 5 -A 30 "realtime"
+# Listar redes de Kong
+docker inspect supabase-kong --format '{{json .NetworkSettings.Networks}}' | jq 'keys'
+
+# Listar redes del contenedor de Realtime (usa el nombre del Paso 1)
+docker inspect <NOMBRE_REAL_CONTAINER_REALTIME> --format '{{json .NetworkSettings.Networks}}' | jq 'keys'
 ```
+
+**Si las dos listas no comparten al menos una red en común** → Docker DNS no resuelve entre ellos. Vas a la [Solución B](#solución-b).
 
 ---
 
-### Paso 5: Verificar el proxy externo (Dokploy/Traefik)
+### Paso 4 — Verificar resolución DNS desde Kong
 
-Dokploy usa **Traefik** como reverse proxy. Traefik necesita pasar WebSocket correctamente.
-
-Verifica los labels de Docker del servicio de Supabase en Dokploy:
+Una vez que sepas el nombre real del contenedor (Paso 1), prueba si Kong lo puede resolver:
 
 ```bash
-# Ver labels del contenedor expuesto (Kong normalmente)
-docker inspect supabase-kong | jq '.[0].Config.Labels' | grep -i traefik
+docker exec supabase-kong getent hosts <NOMBRE_REAL_CONTAINER_REALTIME>
 ```
 
-Para WebSocket, Traefik necesita:
-- NO tener timeout que corte conexiones largas
-- Headers `Upgrade` y `Connection` deben propagarse
-
-**Verifica en la configuración de Traefik**:
-
-```bash
-# Ver la configuración dinámica de Traefik
-docker exec traefik cat /etc/traefik/traefik.yml 2>/dev/null || docker exec traefik cat /traefik.yml 2>/dev/null
-```
-
-O busca los middlewares activos:
-
-```bash
-# Ver routers y middlewares activos
-curl -s http://localhost:8080/api/http/routers 2>/dev/null | jq '.'
-```
-
-> **IMPORTANTE**: Traefik soporta WebSocket **por defecto** si no hay middlewares que lo interfieran. El problema más común es un **timeout demasiado bajo** o un middleware que reescribe headers.
+- **Devuelve una IP** → DNS funciona, problema es solo `kong.yml` mal configurado → [Solución A](#solución-a)
+- **No devuelve nada / error** → confirma problema de red → [Solución B](#solución-b)
 
 ---
 
-### Paso 6: Probar el WebSocket directamente
+## ✅ Soluciones
 
-Desde el servidor, prueba conectarte al WebSocket:
+### Solución A — Hostname del `kong.yml` no coincide con el contenedor real
 
-```bash
-# Instalar websocat si no está disponible
-# Con curl usando upgrade headers:
-curl -i -N \
-  -H "Connection: Upgrade" \
-  -H "Upgrade: websocket" \
-  -H "Sec-WebSocket-Version: 13" \
-  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  "https://supabase.genzai.cloud/realtime/v1/websocket?apikey=TU_ANON_KEY&vsn=1.0.0"
+Edita el `kong.yml` (o el archivo donde esté la config de Kong) y reemplaza el `url:` del service `realtime-v1` con el hostname real del contenedor.
+
+**Ejemplo**, si el contenedor real se llama `supabase-realtime`:
+
+```yaml
+- name: realtime-v1
+  url: http://supabase-realtime:4000/socket
+  routes:
+    - name: realtime-v1
+      strip_path: true
+      paths:
+        - /realtime/v1/
 ```
 
-**Esperado**: Respuesta `101 Switching Protocols`
+> **OJO con el path `/socket`**: el servicio Realtime de Supabase escucha en `/socket` por defecto. NO lo quites del `url:`. Solo cambia el hostname.
+>
+> **OJO con el puerto**: verifica que el contenedor de Realtime expone realmente el puerto 4000 con `docker port <NOMBRE_REAL>`. Algunas versiones usan otro puerto interno.
 
-**Si devuelve 502/503/504**: El servicio Realtime no es accesible a través del proxy.
-
-También prueba internamente sin SSL:
-
-```bash
-curl -i -N \
-  -H "Connection: Upgrade" \
-  -H "Upgrade: websocket" \
-  -H "Sec-WebSocket-Version: 13" \
-  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
-  "http://localhost:8000/realtime/v1/websocket?apikey=TU_ANON_KEY&vsn=1.0.0"
-```
-
-Si el test interno (puerto 8000) funciona pero el externo (HTTPS) falla → **el problema es Traefik/Dokploy**.
-
----
-
-### Paso 7: Verificar la publicación Realtime en PostgreSQL
-
-Conéctate a la base de datos y verifica que las tablas están en la publicación:
-
-```bash
-docker exec -it supabase-db psql -U postgres -c "SELECT * FROM pg_publication_tables WHERE pubname = 'supabase_realtime';"
-```
-
-**Esperado**: Deben aparecer `activity_feed` y `notifications` en los resultados.
-
-Si NO aparecen, ejecuta:
-
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE activity_feed;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
-```
-
----
-
-### Paso 8: Verificar variables de entorno del servicio Realtime
-
-El servicio Realtime necesita estas variables configuradas correctamente:
-
-```bash
-docker exec supabase-realtime env | grep -E "(DB_|SECRET|API)"
-```
-
-Variables críticas:
-- `DB_HOST` — Debe apuntar al host de PostgreSQL (usualmente `supabase-db` o el nombre del servicio en Docker)
-- `DB_PORT` — 5432
-- `DB_USER` — `supabase_admin` o el usuario configurado
-- `DB_PASSWORD` — La contraseña de la DB
-- `API_JWT_SECRET` — Debe coincidir con el JWT secret del resto de Supabase
-- `SECRET_KEY_BASE` — Para sesiones internas de Realtime (Phoenix framework)
-
----
-
-## 🛠️ Soluciones según diagnóstico
-
-### Solución A: Servicio Realtime caído → Reiniciar
-
-```bash
-docker restart supabase-realtime
-docker logs -f supabase-realtime --tail 50
-```
-
-### Solución B: Kong no tiene ruta para Realtime → Agregar configuración
-
-Edita el `kong.yml` y agrega la ruta de Realtime. Luego recarga Kong:
+Recarga Kong sin reiniciar:
 
 ```bash
 docker exec supabase-kong kong reload
 ```
 
-### Solución C: Traefik bloquea WebSocket → Agregar headers/timeout
+Si Kong corre con config declarativa montada como volumen, también puede requerir reiniciar el contenedor:
 
-En la configuración de Dokploy para el servicio de Supabase, asegúrate de que los labels de Traefik incluyan:
-
-```yaml
-# Si se configuran vía docker-compose labels:
-traefik.http.middlewares.supabase-ws.headers.customrequestheaders.Connection: "upgrade"
-traefik.http.middlewares.supabase-ws.headers.customrequestheaders.Upgrade: "websocket"
-```
-
-O en la configuración de Traefik, asegúrate de que el `serversTransport` tenga timeout adecuado:
-
-```yaml
-serversTransport:
-  forwardingTimeouts:
-    dialTimeout: "30s"
-    responseHeaderTimeout: "0s"
-    idleConnTimeout: "90s"
-```
-
-### Solución D: Publicación PostgreSQL faltante → Ejecutar SQL
-
-```sql
-ALTER PUBLICATION supabase_realtime ADD TABLE activity_feed;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+```bash
+docker restart supabase-kong
 ```
 
 ---
 
-## ✅ Verificación Final
+### Solución B — Kong y Realtime en redes distintas
 
-Una vez aplicada la solución, verifica:
+Conecta el contenedor de Realtime a la misma red que Kong:
 
-1. **Desde el servidor**: El test de WebSocket del Paso 6 devuelve `101 Switching Protocols`
-2. **Desde el navegador**: Abre el dashboard → La sección "Actividad Reciente" muestra **"En vivo"** con icono verde
-3. **Test end-to-end**: Inserta un registro de prueba:
+```bash
+# Obtener el nombre de la red de Kong
+NETWORK=$(docker inspect supabase-kong --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}' | head -1)
 
-```sql
-INSERT INTO activity_feed (source, event_type, actor, action, description)
-VALUES ('telegram', 'test', 'admin', 'test', 'Test de Realtime - si ves esto, funciona ✅');
+# Conectar Realtime a esa red
+docker network connect $NETWORK <NOMBRE_REAL_CONTAINER_REALTIME>
 ```
 
-El nuevo evento debe aparecer **instantáneamente** en el dashboard sin refrescar la página.
+Verifica:
+
+```bash
+docker exec supabase-kong getent hosts <NOMBRE_REAL_CONTAINER_REALTIME>
+```
+
+**Si esto se hizo manualmente, no es persistente.** Para que sobreviva un reinicio del stack, hay que arreglar el `docker-compose.yml` (o la config equivalente de Dokploy) para que ambos servicios declaren la misma red.
 
 ---
 
-## 📊 Resumen de acciones posibles
+### Solución D — Contenedor de Realtime no existe
 
-| # | Verificación | Comando clave | Solución si falla |
-|---|-------------|---------------|-------------------|
-| 1 | Contenedor Realtime corriendo | `docker ps \| grep realtime` | `docker restart supabase-realtime` |
-| 2 | Conectividad interna | `docker exec supabase-kong wget ...` | Revisar red Docker |
-| 3 | Ruta Kong configurada | `cat kong.yml \| grep realtime` | Agregar ruta en kong.yml |
-| 4 | WebSocket en Kong | Verificar plugins | Remover plugins bloqueantes |
-| 5 | Traefik pasa WebSocket | `docker inspect` labels | Agregar headers WS en Dokploy |
-| 6 | WebSocket externo funciona | `curl -i -N ...` con Upgrade | Depende del paso que falle |
-| 7 | Publicación PostgreSQL | `pg_publication_tables` | `ALTER PUBLICATION ADD TABLE` |
-| 8 | Variables de entorno Realtime | `docker exec ... env` | Corregir .env de Realtime |
+Si el Paso 1 no devolvió ningún contenedor de Realtime, el servicio nunca se desplegó (o se cayó y Dokploy no lo levantó).
 
----
-
-## 📁 Archivos del proyecto relevantes (referencia, no los modifiques)
-
-Estos archivos viven en el repositorio de la app Next.js y NO necesitan cambios — el problema es de infraestructura del servidor:
-
-- `src/hooks/use-activity-feed.ts` — Hook que suscribe a `activity_feed` vía Realtime
-- `src/hooks/use-notifications.ts` — Hook que suscribe a `notifications` vía Realtime
-- `src/lib/supabase/client.ts` — Crea el cliente browser con `NEXT_PUBLIC_SUPABASE_URL`
-- `src/components/dashboard/activity-feed.tsx` — UI que muestra el feed y estado de conexión
-- `supabase/migrations/005_notifications.sql` — Migración que crea las tablas y las agrega a `supabase_realtime`
-
-La URL de Supabase es: `https://supabase.genzai.cloud`
-El WebSocket intenta conectar a: `wss://supabase.genzai.cloud/realtime/v1/websocket`
+1. Revisa el stack de Supabase en Dokploy → confirma que el servicio `realtime` está habilitado
+2. Si falta, agrégalo desde el `docker-compose.yml` oficial de Supabase self-hosted
+3. Levanta el servicio:
+   ```bash
+   docker compose up -d realtime
+   ```
+4. Verifica logs:
+   ```bash
+   docker logs <NOMBRE_REAL_CONTAINER_REALTIME> --tail 100
+   ```
 
 ---
 
-> **⚠️ NOTA FINAL**: Una vez resuelto el problema, documenta qué solución se aplicó y qué configuración se cambió, para que pueda actualizar el `claude.md` del proyecto con la información de infraestructura.
+## ✅ Verificación final
+
+Después de aplicar la fix, ejecuta estos 3 tests **en orden**:
+
+### Test 1 — Desde cualquier máquina, sin acceso al servidor
+
+```bash
+curl -i -m 10 "https://supabase.genzai.cloud/realtime/v1/?apikey=<ANON_KEY>"
+```
+
+**Esperado**: cualquier cosa **menos** `503 name resolution failed`. Lo más probable es `200`, `404`, o `426 Upgrade Required` desde el servicio Realtime. Cualquiera de esos confirma que Kong ya alcanza al backend.
+
+### Test 2 — Upgrade WebSocket directo
+
+```bash
+curl -i -m 10 \
+  -H "Connection: Upgrade" \
+  -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  "https://supabase.genzai.cloud/realtime/v1/websocket?apikey=<ANON_KEY>&vsn=1.0.0"
+```
+
+**Esperado**: `101 Switching Protocols`.
+
+### Test 3 — End-to-end desde el navegador
+
+1. Abre `https://dashboard.genzai.cloud` (la app Next.js)
+2. Login → ve al dashboard
+3. La sección "Actividad Reciente" debe mostrar **"En vivo"** con icono Wifi verde (no "Desconectado")
+4. En SQL Editor de Supabase corre:
+   ```sql
+   INSERT INTO activity_feed (source, event_type, actor, action, description)
+   VALUES ('telegram', 'test', 'admin', 'test', 'Test Realtime — si ves esto en el dashboard sin recargar, funciona ✅');
+   ```
+5. El evento debe aparecer **instantáneamente** en el dashboard sin recargar
+
+---
+
+## 📁 Archivos del proyecto Next.js (NO los toques)
+
+Estos archivos están bien y NO necesitan cambios. Listados solo como referencia por si el agente quiere entender el flujo del cliente:
+
+- `src/hooks/use-activity-feed.ts` — suscribe a `activity_feed`
+- `src/hooks/use-notifications.ts` — suscribe a `notifications`
+- `src/lib/supabase/client.ts` — cliente browser
+- `src/components/dashboard/activity-feed.tsx` — UI del feed con indicador de conexión
+- `supabase/migrations/005_notifications.sql` — tablas + `ALTER PUBLICATION`
+
+URL Supabase: `https://supabase.genzai.cloud`
+WebSocket target: `wss://supabase.genzai.cloud/realtime/v1/websocket`
+
+---
+
+## 📝 Cuando termines
+
+Documenta qué solución aplicaste exactamente:
+- ¿Cuál era el hostname mal configurado en `kong.yml`?
+- ¿Cuál es el nombre real del contenedor de Realtime?
+- ¿Tuviste que tocar la red Docker o solo el `kong.yml`?
+- ¿La fix sobrevive a un `docker compose down && up`?
+
+Eso me permite actualizar el `claude.md` del proyecto con la info de infraestructura para que no nos vuelva a pasar.

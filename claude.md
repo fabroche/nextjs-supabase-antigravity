@@ -279,6 +279,36 @@ TELEGRAM_WEBHOOK_SECRET=your-webhook-secret     # Also stored in webhook_sources
 
 **Current Setup**: Self-hosted Supabase instance at `https://supabase.genzai.cloud`
 
+### Dokploy Infrastructure
+
+**Hosting**: Hostinger VPS with Dokploy managing the Supabase stack
+
+**Key paths on server**:
+- **Kong config**: `/etc/dokploy/compose/supabase-supabase-zovmga/files/volumes/api/kong.yml`
+- **Stack prefix**: `supabase-supabase-zovmga-` (Dokploy-generated, prepended to all container names)
+
+**Dokploy + Supabase gotcha (resolved 2026-04-09)**:
+
+Dokploy renames containers with its stack prefix, breaking Kong's hardcoded upstream hostnames. Two fixes applied to `kong.yml`:
+
+1. **Upstream hostname**: Changed `realtime-dev.supabase-realtime` → `realtime` (Docker Compose network alias, stable across renames)
+2. **Host header for multi-tenant Realtime**: Supabase Realtime v2 uses the `Host` header as tenant lookup key. The tenant in `_realtime.tenants` is called `realtime-dev`, but Kong was sending `Host: realtime`. Fix: added `request-transformer` plugin to replace `Host` → `realtime-dev` on both Realtime services (ws + rest)
+
+```yaml
+# Added to both realtime-v1-ws and realtime-v1-rest services in kong.yml
+plugins:
+  - name: request-transformer
+    config:
+      replace:
+        headers:
+          - host:realtime-dev
+```
+
+**Important notes**:
+- Use `docker restart` for Kong, NOT `kong reload` — Kong's entrypoint runs `envsubst` on `temp.yml` → `kong.yml` at boot; reload doesn't re-process the template
+- `SEED_SELF_HOST=true` on the Realtime container overwrites `_realtime.tenants.jwt_secret` on every restart — don't try to fix tenant config directly in the DB
+- All services share the same JWT secret across the stack
+
 ---
 
 ## Dashboard Implementation
@@ -607,7 +637,7 @@ import { createServerClient } from "@supabase/ssr";
 
 **RLS Pattern**: All tables have RLS enabled. Negocio users access only their own data (via `owner_id` or `business_id` chain). Admin users access everything via `is_admin()`.
 
-**Realtime**: `activity_feed` and `notifications` tables are added to `supabase_realtime` publication for live updates.
+**Realtime**: `activity_feed` and `notifications` tables are added to `supabase_realtime` publication for live updates. ✅ Verified working end-to-end in production (2026-04-09) — INSERTs propagate instantly to the dashboard via WebSocket.
 
 **Indexes**: Composite index on `transactions(business_id, status, created_at DESC)` covers the main metrics/chart queries. Partial index on `notifications(user_id, read) WHERE read = false` for unread count.
 
@@ -634,6 +664,7 @@ supabase/migrations/
 - ✅ Migrations executed in Supabase (2026-04-05)
 - ✅ Frontend connected to real Supabase data (mock-businesses.ts deleted)
 - ✅ Hotfix: `business_metrics` view — added upper bound to current-month date filters (2026-04-05)
+- ✅ Realtime WebSocket working in production (2026-04-09) — Kong fix for Dokploy hostnames + Realtime v2 multi-tenant Host header
 - ⏳ Current seed data is for testing — metrics will change for production
 
 ---
@@ -669,11 +700,14 @@ npx shadcn@latest add select
 
 ### Immediate Priorities
 
-1. **Sprint 3 — Remaining phases** (next up)
+1. **Register Telegram webhook + end-to-end test** (next up)
+   - Deploy to Dokploy with env vars (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`)
+   - Run `curl` to register webhook with BotFather (command ready in previous session)
+   - Send message to bot → verify it appears in activity feed + notifications
+2. **Sprint 3 — Remaining phases**
    - Add normalizers for Dokploy, Notion, N8N (Fase 4)
    - Settings panel for users to link telegram_id / notion_person_id (Fase 5)
    - Dead letter admin view (Fase 5)
-   - Register Telegram webhook with BotFather + test end-to-end
 
 ### Completed Features
 
@@ -920,6 +954,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-08_  
-_Version: 0.7.0_  
-_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Reports + Notifications + Webhooks + Realtime_
+_Last Updated: 2026-04-10_  
+_Version: 0.7.1_  
+_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Reports + Notifications + Webhooks + Realtime (production-verified)_
