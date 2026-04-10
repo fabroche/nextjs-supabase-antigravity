@@ -11,6 +11,19 @@ export async function POST(
   const body = await req.text()
   const headers = Object.fromEntries(req.headers)
 
+  // DEBUG: capture raw payload for sources we're developing normalizers for
+  // TODO: remove this once dokploy normalizer is complete
+  if (source === 'dokploy') {
+    try {
+      await getSupabaseAdmin().from('webhook_dead_letters').insert({
+        source,
+        payload: { raw_body: body, parsed: JSON.parse(body || '{}') },
+        error: 'DEBUG: raw payload capture',
+        headers,
+      })
+    } catch { /* ignore capture errors */ }
+  }
+
   const isValid = await validateWebhook(source, body, headers)
   if (!isValid) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
