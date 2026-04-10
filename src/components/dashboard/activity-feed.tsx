@@ -13,9 +13,9 @@ const SOURCE_ICONS: Record<string, string> = {
 }
 
 const SEVERITY_STYLES: Record<string, string> = {
-  success: 'border-l-2 border-l-green-500 pl-3',
-  warning: 'border-l-2 border-l-yellow-500 pl-3',
-  error: 'border-l-2 border-l-destructive pl-3',
+  success: 'border-l-2 border-l-green-500 bg-green-500/5 pl-3 pr-2 py-1.5 rounded-r-md',
+  warning: 'border-l-2 border-l-yellow-500 bg-yellow-500/5 pl-3 pr-2 py-1.5 rounded-r-md',
+  error: 'border-l-2 border-l-destructive bg-destructive/5 pl-3 pr-2 py-1.5 rounded-r-md',
 }
 
 export function ActivityFeed() {
