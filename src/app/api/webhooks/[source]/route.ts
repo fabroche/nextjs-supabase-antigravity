@@ -42,6 +42,7 @@ async function processWebhook(
         action: event.action,
         description: event.description,
         channel: event.channel ?? null,
+        severity: event.severity ?? null,
         metadata: event.metadata ?? {},
       })
     if (feedError) throw feedError

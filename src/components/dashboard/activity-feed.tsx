@@ -12,6 +12,12 @@ const SOURCE_ICONS: Record<string, string> = {
   n8n: '⚡',
 }
 
+const SEVERITY_STYLES: Record<string, string> = {
+  success: 'border-l-2 border-l-green-500 pl-3',
+  warning: 'border-l-2 border-l-yellow-500 pl-3',
+  error: 'border-l-2 border-l-destructive pl-3',
+}
+
 export function ActivityFeed() {
   const { events, isConnected } = useActivityFeed()
 
@@ -50,7 +56,7 @@ export function ActivityFeed() {
         ) : (
           <div className="space-y-3">
             {events.map((event) => (
-              <div key={event.id} className="flex items-start gap-3 text-sm">
+              <div key={event.id} className={`flex items-start gap-3 text-sm ${event.severity ? SEVERITY_STYLES[event.severity] ?? '' : ''}`}>
                 <span className="text-base leading-none mt-0.5">
                   {SOURCE_ICONS[event.source] ?? '🔔'}
                 </span>

@@ -62,6 +62,7 @@ export interface DbActivityFeed {
   action: string
   description: string
   channel: string | null
+  severity: 'success' | 'warning' | 'error' | null
   metadata: Record<string, unknown>
   created_at: string
 }
