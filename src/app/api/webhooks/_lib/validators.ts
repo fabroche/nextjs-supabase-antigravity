@@ -20,9 +20,10 @@ export async function validateWebhook(
       return headers['x-telegram-bot-api-secret-token'] === data.secret
 
     case 'dokploy': {
-      const sig = headers['x-dokploy-signature']
-      const expected = 'sha256=' + crypto.createHmac('sha256', data.secret).update(rawBody).digest('hex')
-      return sig === expected
+      // Dokploy uses ntfy protocol — auth via Bearer token
+      const authHeader = headers['authorization'] || ''
+      const token = authHeader.replace('Bearer ', '')
+      return token === data.secret
     }
 
     case 'notion': {

@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import type { NormalizedEvent } from './types'
+import type { NormalizedEvent, EventSeverity } from './types'
 
 // Resolve a Telegram user ID to a Supabase user ID via user_profiles.telegram_id
 async function resolveTelegramUser(telegramId: number): Promise<string | null> {
@@ -76,6 +76,42 @@ function normalizeTelegram(payload: Record<string, unknown>): NormalizedEvent | 
   }
 }
 
+// Dokploy uses ntfy protocol: plain text body + metadata in x-* headers
+function normalizeDokploy(payload: Record<string, unknown>): NormalizedEvent | null {
+  const message = ((payload.message as string) || '').trim()
+  const title = ((payload.title as string) || '').trim()
+  const priority = parseInt((payload.priority as string) || '3', 10)
+  const tags = (payload.tags as string) || ''
+
+  if (!message && !title) return null
+
+  // Determine severity from title, message keywords, and ntfy priority
+  const text = `${title} ${message} ${tags}`.toLowerCase()
+  let severity: EventSeverity | null = null
+
+  if (text.includes('fail') || text.includes('error') || text.includes('crash') || priority >= 5) {
+    severity = 'error'
+  } else if (text.includes('warn') || text.includes('timeout') || text.includes('slow') || priority === 4) {
+    severity = 'warning'
+  } else if (text.includes('success') || text.includes('running') || text.includes('deployed') || text.includes('completed')) {
+    severity = 'success'
+  }
+
+  const description = title && message
+    ? `🚀 ${title} — ${message.slice(0, 120)}`
+    : `🚀 ${title || message.slice(0, 140)}`
+
+  return {
+    source: 'dokploy',
+    event_type: severity ? `deploy.${severity}` : 'deploy.info',
+    actor: 'Dokploy',
+    action: title || 'notificación',
+    description,
+    severity,
+    metadata: { priority, tags: tags || undefined },
+  }
+}
+
 export async function normalizeEvent(
   source: string,
   payload: unknown
@@ -101,8 +137,10 @@ export async function normalizeEvent(
       return event
     }
 
+    case 'dokploy':
+      return normalizeDokploy(data)
+
     // Future sources — add normalizers here
-    // case 'dokploy': return normalizeDokploy(data)
     // case 'notion': return normalizeNotion(data)
     // case 'n8n': return normalizeN8N(data)
 

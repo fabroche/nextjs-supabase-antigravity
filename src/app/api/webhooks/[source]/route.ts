@@ -11,25 +11,23 @@ export async function POST(
   const body = await req.text()
   const headers = Object.fromEntries(req.headers)
 
-  // DEBUG: capture raw payload for sources we're developing normalizers for
-  // TODO: remove this once dokploy normalizer is complete
-  if (source === 'dokploy') {
-    try {
-      await getSupabaseAdmin().from('webhook_dead_letters').insert({
-        source,
-        payload: { raw_body: body, parsed: JSON.parse(body || '{}') },
-        error: 'DEBUG: raw payload capture',
-        headers,
-      })
-    } catch { /* ignore capture errors */ }
-  }
-
   const isValid = await validateWebhook(source, body, headers)
   if (!isValid) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  const payload = JSON.parse(body)
+  // Parse body: JSON if possible, otherwise ntfy-style (plain text + headers)
+  let payload: unknown
+  try {
+    payload = JSON.parse(body)
+  } catch {
+    payload = {
+      message: body,
+      title: headers['x-title'] || '',
+      priority: headers['x-priority'] || '3',
+      tags: headers['x-tags'] || '',
+    }
+  }
 
   // Fire-and-forget: respond 200 before processing
   processWebhook(source, payload, headers).catch(console.error)
