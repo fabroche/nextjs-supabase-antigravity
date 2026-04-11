@@ -155,7 +155,6 @@ function parseErrorTrigger(payload: Record<string, unknown>): Record<string, unk
     status: 'error',
     event_type: 'workflow_error',
     error_message: (error?.message as string) || '',
-    error_description: (error?.description as string) || '',
     error_node: (errorNode?.name as string) || (execution.lastNodeExecuted as string) || '',
     error_type: (error?.name as string) || '',
     error_http_code: (error?.httpCode as string) || '',
@@ -178,7 +177,6 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
   const eventType = (data.event_type as string) || ''
   const errorMessage = (data.error_message as string) || ''
   const errorNode = (data.error_node as string) || ''
-  const errorDescription = (data.error_description as string) || ''
   const errorHttpCode = (data.error_http_code as string) || ''
 
   // Map status to severity
@@ -214,9 +212,9 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
     description += ` (${errorHttpCode})`
   }
   if (severity === 'error') {
-    const detail = errorDescription || errorMessage
-    if (detail) {
-      description += ` — ${detail.slice(0, 120)}`
+    // Use errorMessage only — errorDescription may contain leaked credentials
+    if (errorMessage) {
+      description += ` — ${errorMessage.slice(0, 120)}`
     }
   } else {
     if (eventType) {
@@ -252,7 +250,6 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
       error_type: (data.error_type as string) || undefined,
       error_http_code: errorHttpCode || undefined,
       error_message: errorMessage || undefined,
-      error_description: errorDescription || undefined,
       tokens_prompt: tokensPrompt || undefined,
       tokens_completion: tokensCompletion || undefined,
       cost_usd: costUsd || undefined,
