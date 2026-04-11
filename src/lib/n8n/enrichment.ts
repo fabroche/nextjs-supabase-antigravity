@@ -22,7 +22,7 @@ export async function fetchN8NExecutionDetail(
   executionId: string
 ): Promise<N8NExecutionDetail | null> {
   try {
-    const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/executions/${executionId}`
+    const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/executions/${executionId}?includeData=true`
     const res = await fetch(url, {
       headers: {
         'X-N8N-API-KEY': apiKey,
