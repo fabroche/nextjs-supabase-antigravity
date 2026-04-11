@@ -1,880 +1,313 @@
-# Sprint 3 — Plan de Implementación: Sistema de Notificaciones en Tiempo Real con Webhooks
+# Sprint 3 — Plan de Implementación: Sección "Automatizaciones" + N8N Analytics
 
-> **Estado**: Pendiente  
-> **Dependencia**: Sprint 2 debe estar completado ✅  
-> **Versión objetivo**: 0.6.0  
-> **Fecha de creación**: 2026-04-07
+> **Estado**: En progreso  
+> **Fecha de creación**: 2026-04-11  
+> **Dependencia**: Sprint 3 original (v0.7.0) completado ✅  
+> **Versión objetivo**: 0.8.0
 
 ---
 
 ## Objetivo
 
-Implementar un sistema de notificaciones en tiempo real conectado a servicios externos via
-webhooks. Los eventos de Telegram, Dokploy, Notion y N8N se reciben, normalizan y propagan
-al frontend usando Supabase Realtime. El usuario ve un feed de actividad general y
-notificaciones personales con badge de no-leídas en el header.
+Implementar una sección completa **"Automatizaciones"** en el dashboard para monitorear instancias de N8N, workflows y ejecuciones con:
+
+1. **3 niveles de drill-down**: Todas las instancias → Detalle de instancia → Detalle de workflow
+2. **Token y cost tracking** via enrichment con la API de N8N
+3. **Métricas de negocio personalizables** (data-driven desde tabla `custom_metrics`)
+4. **Precios de modelos LLM** para cálculo automático de costos
+5. **Realtime updates** para ejecuciones nuevas
+
+También se absorben items pendientes del Sprint 3 original (filtros activity feed, paginación, settings, dead letter admin, fix Telegram videollamada).
 
 ---
 
-## Adaptaciones al Proyecto Actual
+## Contexto
 
-> **Importante**: Esta idea fue diseñada de forma genérica. Las siguientes decisiones la adaptan
-> a la arquitectura real del proyecto.
+El dashboard tiene webhooks funcionando (Telegram, Dokploy, N8N) pero los eventos de N8N se almacenan genéricamente en `activity_feed` sin estructura dedicada. Se necesita:
 
-| Diferencia encontrada | Decisión de adaptación |
-|----------------------|----------------------|
-| La idea usa Prisma como ORM | El proyecto usa Supabase directo — **no instalar Prisma** |
-| La idea crea tabla `profiles` | El proyecto ya tiene `user_profiles` — **agregar columnas ahí** |
-| La idea importa desde `supabase-admin` | Crear `src/lib/supabase/admin.ts` con service_role key |
-| La idea importa desde `supabase-client` | Ya existe `src/lib/supabase/client.ts` — usar ese |
-| La idea crea `hooks/` en raíz | Crear `src/hooks/` (no existe aún) |
-| La idea define `NormalizedEvent` en `types.ts` aparte | Agregar a `src/lib/supabase/types.ts` (patron existente) |
-| La idea define queries inline en hooks | Agregar a `src/lib/supabase/queries.ts` (patron existente) |
-| La campana de notificaciones "hidden for v0" | Ya está contemplada en `claude.md` — solo hay que habilitarla |
-| `recent-activity.tsx` existe pero está sin usar | Evaluar en Fase 3 si se reutiliza o coexiste con ActivityFeed |
+- Registrar **instancias** N8N por negocio (multi-tenant)
+- Auto-crear **workflows** al recibir el primer webhook
+- Almacenar **ejecuciones** con datos granulares (tokens, costo, duración, errores)
+- **Enriquecer** ejecuciones via API de N8N (obtener modelo, tokens si no vienen en el payload)
+- **Calcular costos** desde una tabla de precios por modelo
+
+**Notion descartado por ahora** — foco exclusivo en N8N.
 
 ---
 
-## Inventario de lo que ya existe
+## Fases de Implementación
 
-| Recurso | Estado | Notas |
-|---------|--------|-------|
-| `src/lib/supabase/client.ts` | ✅ Listo | Browser client — usar en hooks |
-| `src/lib/supabase/server.ts` | ✅ Listo | Server client — NO usar en webhooks |
-| `src/lib/supabase/types.ts` | ✅ Listo | Agregar `NormalizedEvent`, `DbActivityFeed`, `DbNotification` |
-| `src/lib/supabase/queries.ts` | ✅ Listo | Agregar queries de notifications |
-| `src/contexts/auth-context.tsx` | ✅ Listo | Provee `user.id` para `useNotifications` |
-| `src/components/dashboard/header.tsx` | ✅ Listo | Agregar `<NotificationBell>` entre ThemeToggle y Avatar |
-| `src/components/dashboard/recent-activity.tsx` | ⚠️ Existe sin usar | Evaluar en Fase 3 |
-| `src/hooks/` | ❌ No existe | Crear directorio |
-| `src/lib/supabase/admin.ts` | ❌ No existe | Crear (service_role) |
-| `src/app/api/` | ❌ No existe | Crear directorio con webhooks |
-| `supabase/migrations/005_*.sql` | ❌ No existe | Crear migraciones |
+### Fase 1 — Schema de Base de Datos
+
+**Migración**: `supabase/migrations/008_automatizaciones_schema.sql`
+
+**Tablas nuevas**:
+
+| Tabla | Propósito | Columnas clave |
+|-------|-----------|----------------|
+| `n8n_instances` | Registro de instancias N8N por negocio | `instance_id` (TEXT UNIQUE), `business_id` (FK), `name`, `environment`, `api_base_url`, `api_key`, `is_active` |
+| `n8n_workflows` | Workflows por instancia (auto-creados al recibir webhook) | `instance_id` (FK → n8n_instances), `workflow_id` (TEXT), `name`, `is_active`, `tags`, `last_seen_at`, UNIQUE(instance_id, workflow_id) |
+| `n8n_executions` | Datos granulares de ejecución (tabla core de analytics) | `instance_id` (FK), `workflow_id` (FK), `execution_id` (TEXT), `status`, `event_type`, `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `duration_ms`, `error_message`, `error_node`, `is_enriched`, `metadata` (JSONB), UNIQUE(instance_id, execution_id) |
+| `model_pricing` | Precios por modelo LLM para cálculo de costos | `model_name` (TEXT UNIQUE), `provider`, `cost_per_1k_prompt`, `cost_per_1k_completion`, `is_active` |
+| `custom_metrics` | Métricas de negocio configurables por workflow/instancia | `workflow_id` (FK nullable), `instance_id` (FK nullable), `name`, `slug`, `metric_type` (count/sum/avg/ratio), `filter_event_type`, `source_field`, `display_format`, `icon` |
+
+**Alteraciones**:
+- `activity_feed` += `business_id` (FK nullable → businesses)
+- RLS de `activity_feed` actualizada: admin ve todo, negocio ve sus eventos + eventos sin business_id
+
+**Vistas**:
+- `n8n_instance_stats` — métricas agregadas por instancia (últimos 30 días)
+- `n8n_workflow_stats` — métricas agregadas por workflow (últimos 30 días)
+
+**Función RPC**:
+- `get_execution_trend(instance_id, workflow_id, days)` — ejecuciones/errores/costo por día (para gráficos)
+
+**RLS**: Todas las tablas nuevas siguen el patrón existente:
+- Admin: `is_admin()` → acceso total
+- Negocio: cadena `n8n_executions → n8n_instances → businesses.owner_id = auth.uid()`
+
+**Realtime**: `n8n_executions` añadida a `supabase_realtime`
+
+**Seed data**: `model_pricing` con precios de GPT-4o, GPT-4o-mini, GPT-4.1, GPT-4.1-mini, GPT-4.1-nano, Claude Sonnet 4, Claude Haiku 3.5
 
 ---
 
-## Arquitectura
+### Fase 2 — Pipeline de Normalización + Enriquecimiento
 
+**Archivos a modificar**:
+- `src/app/api/webhooks/_lib/types.ts` — agregar `business_id` a `NormalizedEvent`
+- `src/app/api/webhooks/_lib/normalizers.ts` — N8N normalizer busca instancia y deriva business_id
+- `src/app/api/webhooks/[source]/route.ts` — nueva función `processN8NExecution()`
+
+**Archivos nuevos**:
+- `src/lib/n8n/enrichment.ts` — cliente para API de N8N (`GET /api/v1/executions/{id}`)
+- `src/lib/n8n/cost-calculator.ts` — cálculo de costo desde `model_pricing`
+
+**Flujo de `processN8NExecution()`**:
+1. Lookup `n8n_instances` por `payload.instance_id` → obtiene `business_id`, `api_base_url`, `api_key`
+2. Upsert `n8n_workflows` (auto-crea workflow al primer webhook)
+3. Insert `n8n_executions` con datos disponibles (`is_enriched = false`)
+4. Set `event.business_id` en el NormalizedEvent para `activity_feed`
+5. Si instancia tiene `api_base_url` + `api_key`:
+   - Llama API de N8N para obtener `tokens_prompt`, `tokens_completion`, `model_name`
+   - Calcula costo con `model_pricing`
+   - UPDATE `n8n_executions` con tokens, modelo, costo, `is_enriched = true`
+
+**Duplicados**: Insert con `ON CONFLICT (instance_id, execution_id) DO NOTHING`
+
+---
+
+### Fase 3 — TypeScript Types + Queries
+
+**Archivos a modificar**:
+- `src/lib/supabase/types.ts` — agregar: `DbN8NInstance`, `DbN8NWorkflow`, `DbN8NExecution`, `DbModelPricing`, `DbCustomMetric`, `DbInstanceStats`, `DbWorkflowStats`
+- `src/lib/supabase/queries.ts` — agregar queries para las tablas + custom metrics
+
+**Queries principales**:
+- `fetchInstanceStats(businessId?)` — vista Level 1
+- `fetchGlobalAutomationMetrics(businessId?)` — cards resumen
+- `fetchInstanceDetail(instanceId)` — vista Level 2
+- `fetchWorkflowStats(instanceId)` — workflows de una instancia
+- `fetchWorkflowDetail(workflowId)` — vista Level 3
+- `fetchExecutions(workflowId, filters, page)` — tabla paginada
+- `fetchCustomMetrics(scope)` — definiciones de métricas custom
+- `fetchExecutionTrend(instanceId?, workflowId?, days?)` — datos para gráfico
+
+---
+
+### Fase 4 — Navegación + Layout Compartido
+
+**Archivos a modificar**:
+- `src/components/dashboard/sidebar.tsx` — agregar nav item "Automatizaciones" con icono `Zap`
+  - Cambiar `isActive` de `pathname === item.href` a `item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)`
+
+**Archivos nuevos**:
+- `src/components/dashboard/dashboard-layout.tsx` — wrapper reutilizable (Sidebar + Header + main)
+- Refactor `src/app/page.tsx` para usar `DashboardLayout`
+
+**Rutas**:
 ```
-Telegram / Dokploy / Notion / N8N
-         │
-         ▼
-POST /api/webhooks/[source]          ← src/app/api/webhooks/[source]/route.ts
-  ├── Valida firma/secret
-  ├── Responde 200 OK inmediatamente
-  └── processWebhook() en background (fire-and-forget)
-        ├── normalizeEvent() → NormalizedEvent
-        ├── INSERT activity_feed
-        ├── Si target_user_id → INSERT notifications
-        └── Si falla → INSERT webhook_dead_letters
-                │
-                ▼
-         Supabase DB
-    activity_feed | notifications
-                │
-                ▼ Supabase Realtime
-         Frontend React
-    useActivityFeed | useNotifications
-    ActivityFeed    | NotificationBell (header)
+/automatizaciones                              → Level 1
+/automatizaciones/[instanceId]                 → Level 2
+/automatizaciones/[instanceId]/[workflowId]    → Level 3
 ```
-
-> **Fire-and-forget funciona porque el proyecto se despliega en Dokploy** (servidor Node.js
-> persistente). Si en el futuro se migra a Vercel serverless, este patron necesitaría una cola
-> (Inngest, QStash o Supabase Edge Function).
 
 ---
 
-## Estructura de Archivos Nuevos
+### Fase 5 — Level 1: Vista General de Instancias
+
+**Ruta**: `/automatizaciones`
+
+**Archivos nuevos**:
+- `src/app/automatizaciones/page.tsx`
+- `src/components/automatizaciones/global-metrics.tsx` — 4 MetricCards (ejecuciones, error rate, costo, tokens)
+- `src/components/automatizaciones/instance-card.tsx` — card clickeable con status indicator
+- `src/hooks/use-n8n-executions.ts` — hook Realtime para actualizaciones live
+
+**Estructura visual**:
+```
+[MetricCard: Ejecuciones] [MetricCard: Tasa Error] [MetricCard: Costo] [MetricCard: Tokens]
+
+[InstanceCard: Salón Prod]  [InstanceCard: Genzai Prod]  [InstanceCard: Salon Staging]
+  ● verde                     ● amarillo                    ● gris
+  prod                        prod                          staging
+  152 ejecuciones             89 ejecuciones                12 ejecuciones
+```
+
+---
+
+### Fase 6 — Level 2: Detalle de Instancia
+
+**Ruta**: `/automatizaciones/[instanceId]`
+
+**Archivos nuevos**:
+- `src/app/automatizaciones/[instanceId]/page.tsx`
+- `src/components/automatizaciones/instance-metrics.tsx`
+- `src/components/automatizaciones/workflow-card.tsx`
+- `src/components/automatizaciones/execution-trend-chart.tsx` — Recharts AreaChart (success/error por día)
+- `src/components/automatizaciones/custom-metrics-row.tsx` — métricas custom data-driven
+
+**Estructura visual**:
+```
+Breadcrumb: Automatizaciones > Salón Producción
+
+[MetricCard x4: métricas de esta instancia]
+[CustomMetric x N: métricas de negocio configuradas]
+[AreaChart: tendencia de ejecuciones 30 días]
+
+[WorkflowCard: Agente Salón]    [WorkflowCard: Notificaciones]
+  ● verde                         ● verde
+  Última ejec: hace 5 min         Última ejec: hace 2h
+  45 ejecuciones, 2% error        23 ejecuciones, 0% error
+```
+
+---
+
+### Fase 7 — Level 3: Detalle de Workflow
+
+**Ruta**: `/automatizaciones/[instanceId]/[workflowId]`
+
+**Archivos nuevos**:
+- `src/app/automatizaciones/[instanceId]/[workflowId]/page.tsx`
+- `src/components/automatizaciones/execution-table.tsx` — tabla paginada
+- `src/components/automatizaciones/execution-filters.tsx` — filtros (fecha, status, event_type)
+
+**Estructura visual**:
+```
+Breadcrumb: Automatizaciones > Salón Producción > Agente Salón
+
+[MetricCard x4: métricas del workflow]
+[CustomMetric x N: métricas de negocio de este workflow]
+[AreaChart: tendencia]
+
+[Filtros: DateRangePicker | Status | EventType]
+[Tabla de ejecuciones paginada]
+  Fecha | Estado | Evento | Tokens | Costo | Duración | Error
+  ...
+  [< 1 2 3 ... >]
+```
+
+Reutiliza `DateRangePicker` de `src/components/reports/date-range-picker.tsx`.
+
+---
+
+### Fase 8 — Items Pendientes (del Sprint 3 original)
+
+| Item | Archivos | Detalle |
+|------|----------|---------|
+| **Filtros activity feed** | `activity-feed.tsx`, `use-activity-feed.ts` | Agregar select por source (all/telegram/dokploy/n8n) |
+| **Paginación activity feed** | `activity-feed.tsx`, `use-activity-feed.ts` | Botón "Cargar más" con offset |
+| **Fix Telegram videollamada** | `normalizers.ts` | Detectar `video_chat_started`, `video_chat_participants_invited` |
+| **Settings panel** | `src/app/settings/page.tsx` | Form para vincular telegram_id, notion_person_id. Agregar "Ajustes" al sidebar |
+| **Dead letter admin** | `src/app/admin/dead-letters/page.tsx` | Tabla de dead letters con "marcar resuelto" (admin only) |
+
+---
+
+## Archivos Nuevos (Resumen)
 
 ```
 src/
-├── app/
-│   └── api/
-│       └── webhooks/
-│           └── [source]/
-│               └── route.ts               ← Endpoint dinámico por fuente
-│           └── _lib/
-│               ├── validators.ts          ← Validación de firmas HMAC
-│               ├── normalizers.ts         ← Transformación de payloads
-│               └── types.ts               ← NormalizedEvent (local al endpoint)
-├── components/
-│   ├── notifications/
-│   │   ├── notification-bell.tsx          ← Campana con badge en header
-│   │   └── notification-item.tsx          ← Item individual de la lista
-│   └── dashboard/
-│       └── activity-feed.tsx              ← Feed de actividad en tiempo real
-├── hooks/
-│   ├── use-activity-feed.ts               ← Hook Realtime para activity_feed
-│   └── use-notifications.ts              ← Hook Realtime para notifications
-└── lib/
-    └── supabase/
-        └── admin.ts                       ← Cliente service_role (solo backend)
+  app/
+    automatizaciones/
+      page.tsx                                    ← Level 1
+      [instanceId]/
+        page.tsx                                  ← Level 2
+        [workflowId]/
+          page.tsx                                ← Level 3
+    settings/
+      page.tsx                                    ← Settings panel
+    admin/
+      dead-letters/
+        page.tsx                                  ← Dead letter viewer
+  components/
+    automatizaciones/
+      global-metrics.tsx
+      instance-card.tsx
+      instance-metrics.tsx
+      workflow-card.tsx
+      workflow-metrics.tsx
+      custom-metrics-row.tsx
+      execution-trend-chart.tsx
+      execution-table.tsx
+      execution-filters.tsx
+    dashboard/
+      dashboard-layout.tsx                        ← Layout compartido (refactor)
+  hooks/
+    use-n8n-executions.ts
+  lib/
+    n8n/
+      enrichment.ts                               ← Cliente API N8N
+      cost-calculator.ts                          ← Cálculo de costos
+supabase/
+  migrations/
+    008_automatizaciones_schema.sql
 ```
 
-### Archivos a modificar
+## Archivos a Modificar
 
 | Archivo | Cambio |
 |---------|--------|
-| `src/lib/supabase/types.ts` | Agregar `DbActivityFeed`, `DbNotification` |
-| `src/lib/supabase/queries.ts` | Agregar `markNotificationRead`, `markAllNotificationsRead` |
-| `src/components/dashboard/header.tsx` | Agregar `<NotificationBell>` |
-| `src/app/layout.tsx` | Verificar que `AuthProvider` envuelve toda la app |
-| `supabase/migrations/` | Agregar `005_notifications.sql` y `006_webhook_infrastructure.sql` |
-| `claude.md` | Actualizar al completar |
+| `src/app/api/webhooks/_lib/types.ts` | +`business_id` en NormalizedEvent |
+| `src/app/api/webhooks/_lib/normalizers.ts` | Lookup instancia, derivar business_id |
+| `src/app/api/webhooks/[source]/route.ts` | +`processN8NExecution()`, +business_id en insert |
+| `src/lib/supabase/types.ts` | +7 interfaces nuevas |
+| `src/lib/supabase/queries.ts` | +8 funciones de query |
+| `src/components/dashboard/sidebar.tsx` | +nav item "Automatizaciones", fix isActive |
+| `src/components/dashboard/activity-feed.tsx` | +filtros por source, +paginación |
+| `src/hooks/use-activity-feed.ts` | +soporte filtro y offset |
+| `src/app/api/webhooks/_lib/normalizers.ts` | Fix Telegram videollamada |
+| `src/app/page.tsx` | Refactor para usar DashboardLayout |
+| `CLAUDE.md` | Actualizar al completar |
+| `README.md` | Actualizar al completar |
 
 ---
 
-## Migraciones de Base de Datos
+## Verificación End-to-End
 
-### `supabase/migrations/005_notifications.sql`
-
-```sql
--- ============================================================
--- Notificaciones y Activity Feed
--- ============================================================
-
--- Feed de actividad general (todos los eventos de todas las fuentes)
-CREATE TABLE activity_feed (
-  id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
-  source      TEXT        NOT NULL,                    -- telegram, dokploy, notion, n8n
-  event_type  TEXT        NOT NULL,                    -- message.reply, deploy.success, etc.
-  actor       TEXT        NOT NULL,                    -- quién realizó la acción
-  action      TEXT        NOT NULL,                    -- verbo corto: respondió, desplegó, creó
-  description TEXT        NOT NULL,                    -- texto legible para el feed
-  channel     TEXT,                                    -- contexto: canal, proyecto, servidor
-  metadata    JSONB       DEFAULT '{}',
-  created_at  TIMESTAMPTZ DEFAULT now()
-);
-
--- Notificaciones personales por usuario
-CREATE TABLE notifications (
-  id          UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id     UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  source      TEXT        NOT NULL,
-  event_type  TEXT        NOT NULL,
-  actor       TEXT        NOT NULL,
-  action      TEXT        NOT NULL,
-  description TEXT        NOT NULL,
-  channel     TEXT,
-  metadata    JSONB       DEFAULT '{}',
-  read        BOOLEAN     DEFAULT false,
-  read_at     TIMESTAMPTZ,
-  created_at  TIMESTAMPTZ DEFAULT now()
-);
-
--- Índices de rendimiento
-CREATE INDEX idx_notifications_user_unread ON notifications(user_id, read) WHERE read = false;
-CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
-CREATE INDEX idx_activity_feed_created ON activity_feed(created_at DESC);
-CREATE INDEX idx_activity_feed_source ON activity_feed(source);
-
--- RLS: notifications — cada usuario solo ve las suyas
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users see own notifications"
-  ON notifications FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users update own notifications"
-  ON notifications FOR UPDATE
-  USING (auth.uid() = user_id);
-
--- RLS: activity_feed — visible para todos los usuarios autenticados
-ALTER TABLE activity_feed ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Authenticated users see activity feed"
-  ON activity_feed FOR SELECT
-  USING (auth.role() = 'authenticated');
-
--- Habilitar Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE activity_feed;
-ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
-```
-
-### `supabase/migrations/006_webhook_infrastructure.sql`
-
-```sql
--- ============================================================
--- Infraestructura de Webhooks
--- ============================================================
-
--- Configuración de fuentes de webhook (gestión dinámica de secrets)
-CREATE TABLE webhook_sources (
-  id         UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
-  source     TEXT        UNIQUE NOT NULL,              -- telegram, dokploy, notion, n8n
-  secret     TEXT,                                     -- secret/token para validar firmas
-  is_active  BOOLEAN     DEFAULT true,
-  config     JSONB       DEFAULT '{}',                 -- config específica por fuente
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Dead letter queue: webhooks que fallaron al procesarse
-CREATE TABLE webhook_dead_letters (
-  id         UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
-  source     TEXT        NOT NULL,
-  payload    JSONB       NOT NULL,
-  error      TEXT,
-  headers    JSONB,
-  retries    INTEGER     DEFAULT 0,
-  resolved   BOOLEAN     DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- RLS: webhook_sources y dead_letters solo accesibles via service_role (backend)
--- No se habilita RLS con políticas públicas — el acceso es exclusivamente desde
--- el endpoint de webhook usando la SUPABASE_SERVICE_ROLE_KEY
-
--- Seed inicial de fuentes (insertar secrets después por ENV o panel)
-INSERT INTO webhook_sources (source, is_active) VALUES
-  ('telegram', true),
-  ('dokploy',  true),
-  ('notion',   true),
-  ('n8n',      true);
-
--- Identidad por plataforma en user_profiles (mapeo de usuarios entre servicios)
--- Nota: esta tabla ya existe como user_profiles en este proyecto
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS telegram_id       TEXT UNIQUE;
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS notion_person_id  TEXT UNIQUE;
--- Futuras integraciones:
--- ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS discord_id TEXT UNIQUE;
--- ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS github_username TEXT UNIQUE;
-```
-
-> **Nota sobre `user_profiles`**: El proyecto ya tiene esta tabla (creada en `001_foundation.sql`).
-> Se agregan columnas de identidad ahí en lugar de crear una tabla de mapeo separada.
-> Los usuarios vinculan sus IDs desde un panel de Settings (Fase 5).
+1. **Fase 1**: Ejecutar migración → verificar tablas con `\dt` en SQL Editor
+2. **Fase 2**: Registrar instancia en `n8n_instances` → enviar webhook → verificar que `n8n_executions` tiene fila con tokens y costo
+3. **Fase 3**: Verificar `npx tsc --noEmit` sin errores
+4. **Fase 4**: Navegar a `/automatizaciones` desde sidebar → verificar que resalta correctamente
+5. **Fase 5**: Ver cards de instancias con datos reales, verificar Realtime
+6. **Fase 6**: Click en instancia → ver detalle con workflows y gráfico de tendencia
+7. **Fase 7**: Click en workflow → ver tabla de ejecuciones con filtros y paginación
+8. **Fase 8**: Filtrar activity feed por source, paginación, fix videollamada Telegram
 
 ---
 
-## Variables de Entorno a Agregar en `.env.local`
+## Notas de Diseño
 
-```bash
-# Service role key — NUNCA exponer al cliente, solo usar en API routes
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-
-# Notion
-NOTION_API_KEY=ntn_...
-NOTION_WEBHOOK_SECRET=tu-secret
-NOTION_SPRINT_DB_ID=abc123...          # ID de la base de datos Sprint en Notion
-
-# Telegram (el secret se puede guardar en webhook_sources o en ENV)
-TELEGRAM_WEBHOOK_SECRET=tu-secret
-
-# Dokploy
-DOKPLOY_WEBHOOK_SECRET=tu-secret
-
-# N8N
-N8N_WEBHOOK_SECRET=tu-secret
-```
+- **Costo**: Prioridad: payload `cost_usd` > calculado por enrichment > 0
+- **Enrichment**: Non-blocking — se inserta la ejecución primero, se enriquece después. Si falla, la fila queda con `is_enriched = false`
+- **Custom metrics**: Data-driven via tabla `custom_metrics`. Inicialmente se configuran via SQL, UI de administración en sprint futuro
+- **RLS performance**: Si las queries se vuelven lentas por los JOINs de 3 tablas en RLS, agregar `business_id` denormalizado a `n8n_executions`
+- **Componentes reutilizados**: `MetricCard`, `Card`, `Table`, `Badge`, `DateRangePicker`, `Tabs`, Recharts
+- **Seguridad**: `error.description` de N8N puede contener API keys — solo usar `error.message` (genérico)
+- **N8N sub-nodes**: Los modelos AI dentro de Agent nodes no exponen tokenUsage al flujo principal — usar API enrichment
 
 ---
 
-## Implementación Detallada
-
-### Paso 1 — `src/lib/supabase/admin.ts` (nuevo)
-
-```typescript
-// Cliente Supabase con service_role — SOLO usar en API routes (backend)
-// Nunca importar desde componentes cliente o hooks
-import { createClient } from '@supabase/supabase-js'
-
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-```
-
----
-
-### Paso 2 — Tipos en `src/lib/supabase/types.ts` (agregar al final)
-
-```typescript
-// Table: activity_feed
-export interface DbActivityFeed {
-  id: string
-  source: string
-  event_type: string
-  actor: string
-  action: string
-  description: string
-  channel: string | null
-  metadata: Record<string, unknown>
-  created_at: string
-}
-
-// Table: notifications
-export interface DbNotification {
-  id: string
-  user_id: string
-  source: string
-  event_type: string
-  actor: string
-  action: string
-  description: string
-  channel: string | null
-  metadata: Record<string, unknown>
-  read: boolean
-  read_at: string | null
-  created_at: string
-}
-```
-
----
-
-### Paso 3 — Queries en `src/lib/supabase/queries.ts` (agregar al final)
-
-```typescript
-import type { DbActivityFeed, DbNotification } from './types'
-
-export async function fetchActivityFeed(limit = 50): Promise<DbActivityFeed[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('activity_feed')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) throw error
-  return data || []
-}
-
-export async function fetchNotifications(userId: string, limit = 30): Promise<DbNotification[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit)
-  if (error) throw error
-  return data || []
-}
-
-export async function markNotificationRead(notificationId: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('notifications')
-    .update({ read: true, read_at: new Date().toISOString() })
-    .eq('id', notificationId)
-  if (error) throw error
-}
-
-export async function markAllNotificationsRead(userId: string): Promise<void> {
-  const supabase = createClient()
-  const { error } = await supabase
-    .from('notifications')
-    .update({ read: true, read_at: new Date().toISOString() })
-    .eq('user_id', userId)
-    .eq('read', false)
-  if (error) throw error
-}
-```
-
----
-
-### Paso 4 — Hooks de Realtime
-
-**`src/hooks/use-activity-feed.ts`**
-
-```typescript
-'use client'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { fetchActivityFeed } from '@/lib/supabase/queries'
-import type { DbActivityFeed } from '@/lib/supabase/types'
-
-export function useActivityFeed(limit = 50) {
-  const [events, setEvents] = useState<DbActivityFeed[]>([])
-  const [isConnected, setIsConnected] = useState(false)
-
-  useEffect(() => {
-    const supabase = createClient()
-
-    fetchActivityFeed(limit).then(setEvents).catch(console.error)
-
-    const channel = supabase
-      .channel('activity-feed')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'activity_feed' },
-        (payload) => {
-          setEvents((prev) => [payload.new as DbActivityFeed, ...prev].slice(0, limit))
-        }
-      )
-      .subscribe((status) => setIsConnected(status === 'SUBSCRIBED'))
-
-    return () => { supabase.removeChannel(channel) }
-  }, [limit])
-
-  return { events, isConnected }
-}
-```
-
-**`src/hooks/use-notifications.ts`**
-
-```typescript
-'use client'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import {
-  fetchNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-} from '@/lib/supabase/queries'
-import type { DbNotification } from '@/lib/supabase/types'
-
-export function useNotifications(userId: string | undefined) {
-  const [notifications, setNotifications] = useState<DbNotification[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-
-  useEffect(() => {
-    if (!userId) return
-    const supabase = createClient()
-
-    fetchNotifications(userId).then((data) => {
-      setNotifications(data)
-      setUnreadCount(data.filter((n) => !n.read).length)
-    }).catch(console.error)
-
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          setNotifications((prev) => [payload.new as DbNotification, ...prev])
-          setUnreadCount((prev) => prev + 1)
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [userId])
-
-  const handleMarkRead = async (id: string) => {
-    await markNotificationRead(id)
-    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n))
-    setUnreadCount((prev) => Math.max(0, prev - 1))
-  }
-
-  const handleMarkAllRead = async () => {
-    if (!userId) return
-    await markAllNotificationsRead(userId)
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    setUnreadCount(0)
-  }
-
-  return { notifications, unreadCount, markAsRead: handleMarkRead, markAllAsRead: handleMarkAllRead }
-}
-```
-
----
-
-### Paso 5 — Endpoint de Webhooks
-
-**`src/app/api/webhooks/_lib/types.ts`**
-
-```typescript
-export interface NormalizedEvent {
-  source: string
-  event_type: string
-  actor: string
-  action: string
-  description: string
-  channel?: string
-  target_user_id?: string | null
-  metadata?: Record<string, unknown>
-}
-```
-
-**`src/app/api/webhooks/_lib/validators.ts`**
-
-```typescript
-import crypto from 'crypto'
-import { supabaseAdmin } from '@/lib/supabase/admin'
-
-export async function validateWebhook(
-  source: string,
-  rawBody: string,
-  headers: Record<string, string>
-): Promise<boolean> {
-  const { data } = await supabaseAdmin
-    .from('webhook_sources')
-    .select('secret')
-    .eq('source', source)
-    .eq('is_active', true)
-    .single()
-
-  if (!data?.secret) return false
-
-  switch (source) {
-    case 'telegram':
-      return headers['x-telegram-bot-api-secret-token'] === data.secret
-
-    case 'dokploy': {
-      const sig = headers['x-dokploy-signature']
-      const expected = 'sha256=' + crypto.createHmac('sha256', data.secret).update(rawBody).digest('hex')
-      return sig === expected
-    }
-
-    case 'notion': {
-      const sig = headers['x-notion-signature']
-      const expected = crypto.createHmac('sha256', data.secret).update(rawBody).digest('hex')
-      try {
-        return crypto.timingSafeEqual(Buffer.from(sig || ''), Buffer.from(expected))
-      } catch {
-        return false
-      }
-    }
-
-    case 'n8n':
-      return headers['x-n8n-webhook-secret'] === data.secret
-
-    default:
-      return false
-  }
-}
-```
-
-**`src/app/api/webhooks/_lib/normalizers.ts`**
-
-Ver implementación completa en la idea original — es compatible con el proyecto tal como está,
-con un ajuste: en `normalizeTelegram` y `normalizeNotion` la importación de `supabase` debe
-ser `supabaseAdmin` desde `@/lib/supabase/admin`.
-
-```typescript
-// Ajuste clave en normalizers.ts — importar admin client
-import { supabaseAdmin } from '@/lib/supabase/admin'
-
-// Buscar en user_profiles (no en profiles)
-const { data: profile } = await supabaseAdmin
-  .from('user_profiles')          // ← nombre correcto en este proyecto
-  .select('id')
-  .eq('telegram_id', telegramId)
-  .single()
-```
-
-**`src/app/api/webhooks/[source]/route.ts`**
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server'
-import { validateWebhook } from '../_lib/validators'
-import { normalizeEvent } from '../_lib/normalizers'
-import { supabaseAdmin } from '@/lib/supabase/admin'
-
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ source: string }> }
-) {
-  const { source } = await params
-  const body = await req.text()
-  const headers = Object.fromEntries(req.headers)
-
-  const isValid = await validateWebhook(source, body, headers)
-  if (!isValid) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-  }
-
-  const payload = JSON.parse(body)
-
-  // Fire-and-forget: responder 200 antes de procesar
-  processWebhook(source, payload, headers).catch(console.error)
-
-  return NextResponse.json({ ok: true })
-}
-
-async function processWebhook(
-  source: string,
-  payload: unknown,
-  headers: Record<string, string>
-) {
-  try {
-    const event = await normalizeEvent(source, payload)
-    if (!event) return
-
-    const { error: feedError } = await supabaseAdmin
-      .from('activity_feed')
-      .insert({
-        source: event.source,
-        event_type: event.event_type,
-        actor: event.actor,
-        action: event.action,
-        description: event.description,
-        channel: event.channel ?? null,
-        metadata: event.metadata ?? {},
-      })
-    if (feedError) throw feedError
-
-    if (event.target_user_id) {
-      const { error: notifError } = await supabaseAdmin
-        .from('notifications')
-        .insert({
-          user_id: event.target_user_id,
-          source: event.source,
-          event_type: event.event_type,
-          actor: event.actor,
-          action: event.action,
-          description: event.description,
-          channel: event.channel ?? null,
-          metadata: event.metadata ?? {},
-        })
-      if (notifError) throw notifError
-    }
-  } catch (error) {
-    await supabaseAdmin.from('webhook_dead_letters').insert({
-      source,
-      payload,
-      error: (error as Error).message,
-      headers,
-    })
-  }
-}
-```
-
-> **Nota Next.js 15+**: `params` en App Router es ahora una `Promise`. Usar `await params`.
-
----
-
-### Paso 6 — Componentes de Notificaciones
-
-**`src/components/notifications/notification-bell.tsx`**
-
-```tsx
-'use client'
-import { Bell } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { useNotifications } from '@/hooks/use-notifications'
-import { useAuth } from '@/contexts/auth-context'
-import { NotificationItem } from './notification-item'
-
-export function NotificationBell() {
-  const { user } = useAuth()
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications(user?.id)
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Notificaciones</span>
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Marcar todas como leídas
-            </button>
-          )}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <div className="max-h-[360px] overflow-y-auto">
-          {notifications.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Sin notificaciones
-            </p>
-          ) : (
-            notifications.map((n) => (
-              <NotificationItem key={n.id} notification={n} onRead={markAsRead} />
-            ))
-          )}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-```
-
-**`src/components/notifications/notification-item.tsx`**
-
-```tsx
-import { formatDistanceToNow } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { cn } from '@/lib/utils'
-import type { DbNotification } from '@/lib/supabase/types'
-
-const SOURCE_ICONS: Record<string, string> = {
-  telegram: '✈️',
-  dokploy: '🚀',
-  notion: '📝',
-  n8n: '⚡',
-}
-
-interface NotificationItemProps {
-  notification: DbNotification
-  onRead: (id: string) => void
-}
-
-export function NotificationItem({ notification, onRead }: NotificationItemProps) {
-  return (
-    <button
-      onClick={() => !notification.read && onRead(notification.id)}
-      className={cn(
-        'flex w-full gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-muted/50',
-        !notification.read && 'bg-muted/30'
-      )}
-    >
-      <span className="text-base leading-none mt-0.5">
-        {SOURCE_ICONS[notification.source] ?? '🔔'}
-      </span>
-      <div className="flex-1 space-y-1 overflow-hidden">
-        <p className={cn('line-clamp-2 leading-snug', !notification.read && 'font-medium')}>
-          {notification.description}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: es })}
-        </p>
-      </div>
-      {!notification.read && (
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
-      )}
-    </button>
-  )
-}
-```
-
----
-
-### Paso 7 — Habilitar campana en `header.tsx`
-
-Agregar import y componente entre `<ThemeToggle />` y el `<DropdownMenu>` del avatar:
-
-```tsx
-// Agregar import
-import { NotificationBell } from '@/components/notifications/notification-bell'
-
-// Agregar en el JSX, entre ThemeToggle y el avatar dropdown
-<ThemeToggle />
-<NotificationBell />   {/* ← agregar aquí */}
-<DropdownMenu>
-  {/* ... avatar dropdown existente sin cambios */}
-</DropdownMenu>
-```
-
----
-
-### Paso 8 — Activity Feed en dashboard (Fase 3)
-
-**`src/components/dashboard/activity-feed.tsx`**
-
-Crear componente que usa `useActivityFeed()` y muestra el feed en tiempo real.
-Evaluar si reemplaza o convive con `recent-activity.tsx` (que actualmente no se usa).
-Decisión recomendada: **reemplazar** `recent-activity.tsx` con `activity-feed.tsx`
-ya que la funcionalidad es un superset de la que estaba planificada.
-
-Integrar en `page.tsx` como nueva sección debajo del chart (tab Resumen) o como tab propia
-si el volumen de eventos lo justifica. Decidir al momento de la implementación.
-
----
-
-## Configuración de Webhooks por Servicio
-
-### Telegram
-```bash
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{ "url": "https://tu-dominio.com/api/webhooks/telegram", "secret_token": "tu-secret" }'
-```
-
-### Dokploy
-Panel de Dokploy → Settings → Webhooks → URL: `https://tu-dominio.com/api/webhooks/dokploy`
-
-### Notion
-1. [notion.so/my-integrations](https://www.notion.so/my-integrations) → tu integración → pestaña Webhooks
-2. URL: `https://tu-dominio.com/api/webhooks/notion`
-3. Los payloads son **sparse** (solo IDs) — el normalizer hace un fetch de seguimiento a la API
-4. Validar siempre `X-Notion-Signature` en producción
-
-### N8N
-Nodo HTTP Request al final de cada workflow relevante → POST a `https://tu-dominio.com/api/webhooks/n8n`
-
----
-
-## Orden de Implementación
-
-| Fase | Tareas | Descripción |
-|------|--------|-------------|
-| **Fase 1** | Migraciones | Ejecutar `005_notifications.sql` y `006_webhook_infrastructure.sql` en Supabase |
-| **Fase 1** | Admin client | Crear `src/lib/supabase/admin.ts` |
-| **Fase 1** | ENV vars | Agregar `SUPABASE_SERVICE_ROLE_KEY` y secrets de cada servicio |
-| **Fase 2** | Backend webhook | Crear endpoint `/api/webhooks/[source]/route.ts` + validators + normalizers |
-| **Fase 2** | Primer test | Integrar Telegram, probar flujo completo con ngrok en local |
-| **Fase 3** | Hooks | Crear `src/hooks/use-notifications.ts` y `use-activity-feed.ts` |
-| **Fase 3** | Componentes | `notification-bell.tsx`, `notification-item.tsx`, `activity-feed.tsx` |
-| **Fase 3** | Header | Descomentar/agregar `<NotificationBell>` en `header.tsx` |
-| **Fase 4** | Más integraciones | Normalizers para Dokploy, Notion y N8N |
-| **Fase 4** | Notion fetch | Implementar fetch de seguimiento a API de Notion (payloads sparse) |
-| **Fase 5** | Settings | Panel para que usuarios vinculen `telegram_id` y `notion_person_id` |
-| **Fase 5** | Dead letters | Vista de admin para revisar webhooks fallidos |
-| **Fase 5** | Limpieza | Purge automático de events viejos (Supabase cron o pg_cron) |
-
----
-
-## Criterios de Aceptación
-
-- [ ] Migraciones ejecutadas sin errores en Supabase
-- [ ] `POST /api/webhooks/telegram` recibe, valida y persiste eventos
-- [ ] Evento de Telegram aparece en `activity_feed` sin recargar el frontend (Realtime)
-- [ ] Respuesta a mensaje de Telegram genera notificación personal al usuario correcto
-- [ ] Badge de campana muestra número de no-leídas
-- [ ] Click en notificación la marca como leída (badge decrece)
-- [ ] "Marcar todas como leídas" limpia el badge
-- [ ] Deploy de Dokploy aparece en el feed
-- [ ] Tarea asignada en Notion genera notificación al responsable
-- [ ] Webhook inválido (firma incorrecta) devuelve 401 y no persiste nada
-- [ ] Webhook fallido se guarda en `webhook_dead_letters`
-- [ ] `npm run build` sin errores
-
----
-
-## Riesgos y Mitigaciones
-
-| Riesgo | Impacto | Mitigación |
-|--------|---------|------------|
-| Supabase Realtime no activo en las tablas | Frontend no recibe eventos | Verificar `ALTER PUBLICATION` ejecutado correctamente |
-| `SUPABASE_SERVICE_ROLE_KEY` expuesta al cliente | Brecha de seguridad | `admin.ts` solo importado desde API routes, nunca desde componentes |
-| Payloads sparse de Notion tardan en resolverse | Timeouts en background | Fire-and-forget ya resuelve esto; agregar timeout al fetch de Notion API |
-| telegram_id / notion_person_id no configurados | Notificaciones sin destinatario | El evento igual se guarda en activity_feed; notificación simplemente no se crea |
-| Fire-and-forget falla silenciosamente | Se pierden eventos | Dead letter queue captura todos los errores del processWebhook |
-| Migración a Vercel en el futuro | Fire-and-forget deja de funcionar | Documentado; migrar a Inngest o Supabase Edge Function en ese momento |
-
----
-
-## Dependencias a Instalar
-
-```bash
-# date-fns ya debería estar instalado como peer dep de react-day-picker (Sprint 2)
-# Verificar que esté disponible:
-npm ls date-fns
-
-# Si no está:
-npm install date-fns
-```
-
-No se requieren nuevas dependencias de UI — todos los componentes necesarios (`Button`, `DropdownMenu`, `Bell` de lucide) ya están instalados.
-
----
-
-_Fecha de creación: 2026-04-07_  
-_Sprint: 3_  
-_Versión objetivo: 0.6.0_  
-_Dependencia: Sprint 2 completado_
+_Creado: 2026-04-11_  
+_Sprint: 3 (nuevo)_  
+_Version objetivo: 0.8.0_  
+_Dependencia: Sprint 3 original (v0.7.0) completado_
