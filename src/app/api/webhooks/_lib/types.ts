@@ -9,5 +9,6 @@ export interface NormalizedEvent {
   channel?: string
   severity?: EventSeverity | null
   target_user_id?: string | null
+  business_id?: string | null
   metadata?: Record<string, unknown>
 }
