@@ -194,7 +194,7 @@ async function processN8NExecution(
       is_enriched: false,
       metadata: (payload.custom as Record<string, unknown>) || {},
     })
-    .select('id')
+    .select('id, cost_usd')
     .single()
 
   if (execError) {
@@ -202,6 +202,17 @@ async function processN8NExecution(
     if (execError.code === '23505') return
     console.warn('[n8n-pipeline] Failed to insert execution:', execError.message)
     return
+  }
+
+  // 6b. Update event description with calculated cost (so activity_feed shows real cost)
+  if (execution?.cost_usd && Number(execution.cost_usd) > 0) {
+    const totalTokens = tokensPrompt + tokensCompletion
+    const realCost = Number(execution.cost_usd)
+    // Replace the token/cost portion in description
+    event.description = event.description.replace(
+      /\(\d[\d,]* tokens, \$[\d.]+\)/,
+      `(${totalTokens.toLocaleString()} tokens, $${realCost.toFixed(4)})`
+    )
   }
 
   // 7. Async enrichment (non-blocking) — only if instance has API credentials
