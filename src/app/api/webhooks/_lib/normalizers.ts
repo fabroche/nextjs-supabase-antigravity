@@ -133,15 +133,53 @@ function normalizeDokploy(payload: Record<string, unknown>): NormalizedEvent | n
   }
 }
 
+// Detect if payload comes from N8N Error Trigger (nested execution/workflow structure)
+function isErrorTriggerPayload(payload: Record<string, unknown>): boolean {
+  return !!(payload.execution && payload.workflow)
+}
+
+// Parse N8N Error Trigger payload into the flat format normalizeN8N expects
+function parseErrorTrigger(payload: Record<string, unknown>): Record<string, unknown> {
+  const execution = payload.execution as Record<string, unknown>
+  const workflow = payload.workflow as Record<string, unknown>
+  const error = execution.error as Record<string, unknown> | undefined
+  const errorNode = error?.node as Record<string, unknown> | undefined
+
+  return {
+    instance_id: (payload.instance_id as string) || '',
+    instance_name: (payload.instance_name as string) || '',
+    workflow_id: workflow.id,
+    workflow_name: workflow.name,
+    execution_id: execution.id,
+    execution_url: execution.url,
+    status: 'error',
+    event_type: 'workflow_error',
+    error_message: (error?.message as string) || '',
+    error_description: (error?.description as string) || '',
+    error_node: (errorNode?.name as string) || (execution.lastNodeExecuted as string) || '',
+    error_type: (error?.name as string) || '',
+    error_http_code: (error?.httpCode as string) || '',
+    tokens_prompt: 0,
+    tokens_completion: 0,
+    cost_usd: 0,
+  }
+}
+
 function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null {
-  const workflowName = (payload.workflow_name as string) || 'Workflow'
-  const workflowId = (payload.workflow_id as string) || ''
-  const executionId = (payload.execution_id as string) || ''
-  const instanceName = (payload.instance_name as string) || (payload.instance_id as string) || 'N8N'
-  const instanceId = (payload.instance_id as string) || ''
-  const rawStatus = ((payload.status as string) || 'success').toLowerCase()
-  const eventType = (payload.event_type as string) || ''
-  const errorMessage = (payload.error_message as string) || ''
+  // Auto-detect Error Trigger format vs regular execution payload
+  const data = isErrorTriggerPayload(payload) ? parseErrorTrigger(payload) : payload
+
+  const workflowName = (data.workflow_name as string) || 'Workflow'
+  const workflowId = (data.workflow_id as string) || ''
+  const executionId = (data.execution_id as string) || ''
+  const instanceName = (data.instance_name as string) || (data.instance_id as string) || 'N8N'
+  const instanceId = (data.instance_id as string) || ''
+  const rawStatus = ((data.status as string) || 'success').toLowerCase()
+  const eventType = (data.event_type as string) || ''
+  const errorMessage = (data.error_message as string) || ''
+  const errorNode = (data.error_node as string) || ''
+  const errorDescription = (data.error_description as string) || ''
+  const errorHttpCode = (data.error_http_code as string) || ''
 
   // Map status to severity
   let severity: EventSeverity | null = null
@@ -163,19 +201,30 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
   const action = actionMap[rawStatus] || 'ejecutó'
 
   // Build description
-  const tokensPrompt = (payload.tokens_prompt as number) || 0
-  const tokensCompletion = (payload.tokens_completion as number) || 0
-  const costUsd = (payload.cost_usd as number) || 0
+  const tokensPrompt = (data.tokens_prompt as number) || 0
+  const tokensCompletion = (data.tokens_completion as number) || 0
+  const costUsd = (data.cost_usd as number) || 0
   const totalTokens = tokensPrompt + tokensCompletion
 
   let description = `⚡ ${workflowName} ${action}`
-  if (eventType) {
-    description += ` — ${eventType.replace(/_/g, ' ')}`
+  if (errorNode) {
+    description += ` en ${errorNode}`
   }
-  if (severity === 'error' && errorMessage) {
-    description += `: ${errorMessage.slice(0, 100)}`
-  } else if (totalTokens > 0) {
-    description += ` (${totalTokens.toLocaleString()} tokens, $${costUsd.toFixed(3)})`
+  if (errorHttpCode) {
+    description += ` (${errorHttpCode})`
+  }
+  if (severity === 'error') {
+    const detail = errorDescription || errorMessage
+    if (detail) {
+      description += ` — ${detail.slice(0, 120)}`
+    }
+  } else {
+    if (eventType) {
+      description += ` — ${eventType.replace(/_/g, ' ')}`
+    }
+    if (totalTokens > 0) {
+      description += ` (${totalTokens.toLocaleString()} tokens, $${costUsd.toFixed(3)})`
+    }
   }
 
   return {
@@ -196,16 +245,21 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
       workflow_id: workflowId || undefined,
       workflow_name: workflowName,
       execution_id: executionId || undefined,
+      execution_url: (data.execution_url as string) || undefined,
       status: rawStatus,
       event_type: eventType || undefined,
+      error_node: errorNode || undefined,
+      error_type: (data.error_type as string) || undefined,
+      error_http_code: errorHttpCode || undefined,
+      error_message: errorMessage || undefined,
+      error_description: errorDescription || undefined,
       tokens_prompt: tokensPrompt || undefined,
       tokens_completion: tokensCompletion || undefined,
       cost_usd: costUsd || undefined,
-      is_out_of_hours: (payload.is_out_of_hours as boolean) || undefined,
-      chat_id: (payload.chat_id as string) || undefined,
-      duration_ms: (payload.duration_ms as number) || undefined,
-      error_message: errorMessage || undefined,
-      custom: (payload.custom as Record<string, unknown>) || undefined,
+      is_out_of_hours: (data.is_out_of_hours as boolean) || undefined,
+      chat_id: (data.chat_id as string) || undefined,
+      duration_ms: (data.duration_ms as number) || undefined,
+      custom: (data.custom as Record<string, unknown>) || undefined,
     },
   }
 }
