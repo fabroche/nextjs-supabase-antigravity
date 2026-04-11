@@ -1,6 +1,27 @@
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import type { NormalizedEvent, EventSeverity } from './types'
 
+// ── N8N Payload Schema ──────────────────────────────────────────────────
+// Configure in N8N HTTP Request node body (JSON):
+// {
+//   "instance_id":        "prod-1",
+//   "instance_name":      "Production",
+//   "workflow_id":        "{{ $workflow.id }}",
+//   "workflow_name":      "{{ $workflow.name }}",
+//   "execution_id":       "{{ $execution.id }}",
+//   "status":             "success",            // success | error | warning
+//   "event_type":         "cita_confirmada",    // business-level event
+//   "tokens_prompt":      {{ $json.usage.prompt_tokens ?? 0 }},
+//   "tokens_completion":  {{ $json.usage.completion_tokens ?? 0 }},
+//   "cost_usd":           0.015,
+//   "is_out_of_hours":    true,
+//   "chat_id":            "{{ $json.message.chat.id }}",
+//   "duration_ms":        {{ $execution.duration ?? 0 }},
+//   "error_message":      null,
+//   "custom":             {}                    // any extra business data
+// }
+// Headers: x-n8n-webhook-secret: <your-secret>
+
 // Resolve a Telegram user ID to a Supabase user ID via user_profiles.telegram_id
 async function resolveTelegramUser(telegramId: number): Promise<string | null> {
   const { data } = await getSupabaseAdmin()
@@ -112,6 +133,83 @@ function normalizeDokploy(payload: Record<string, unknown>): NormalizedEvent | n
   }
 }
 
+function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null {
+  const workflowName = (payload.workflow_name as string) || 'Workflow'
+  const workflowId = (payload.workflow_id as string) || ''
+  const executionId = (payload.execution_id as string) || ''
+  const instanceName = (payload.instance_name as string) || (payload.instance_id as string) || 'N8N'
+  const instanceId = (payload.instance_id as string) || ''
+  const rawStatus = ((payload.status as string) || 'success').toLowerCase()
+  const eventType = (payload.event_type as string) || ''
+  const errorMessage = (payload.error_message as string) || ''
+
+  // Map status to severity
+  let severity: EventSeverity | null = null
+  if (rawStatus === 'error' || rawStatus === 'failed') {
+    severity = 'error'
+  } else if (rawStatus === 'warning') {
+    severity = 'warning'
+  } else if (rawStatus === 'success') {
+    severity = 'success'
+  }
+
+  // Map status to Spanish action verb
+  const actionMap: Record<string, string> = {
+    success: 'ejecutó correctamente',
+    error: 'falló',
+    failed: 'falló',
+    warning: 'ejecutó con advertencias',
+  }
+  const action = actionMap[rawStatus] || 'ejecutó'
+
+  // Build description
+  const tokensPrompt = (payload.tokens_prompt as number) || 0
+  const tokensCompletion = (payload.tokens_completion as number) || 0
+  const costUsd = (payload.cost_usd as number) || 0
+  const totalTokens = tokensPrompt + tokensCompletion
+
+  let description = `⚡ ${workflowName} ${action}`
+  if (eventType) {
+    description += ` — ${eventType.replace(/_/g, ' ')}`
+  }
+  if (severity === 'error' && errorMessage) {
+    description += `: ${errorMessage.slice(0, 100)}`
+  } else if (totalTokens > 0) {
+    description += ` (${totalTokens.toLocaleString()} tokens, $${costUsd.toFixed(3)})`
+  }
+
+  return {
+    source: 'n8n',
+    event_type: severity === 'error'
+      ? 'workflow.error'
+      : eventType
+        ? `workflow.${eventType.toLowerCase()}`
+        : 'workflow.execution',
+    actor: workflowName,
+    action,
+    description,
+    channel: instanceName,
+    severity,
+    metadata: {
+      instance_id: instanceId || undefined,
+      instance_name: instanceName,
+      workflow_id: workflowId || undefined,
+      workflow_name: workflowName,
+      execution_id: executionId || undefined,
+      status: rawStatus,
+      event_type: eventType || undefined,
+      tokens_prompt: tokensPrompt || undefined,
+      tokens_completion: tokensCompletion || undefined,
+      cost_usd: costUsd || undefined,
+      is_out_of_hours: (payload.is_out_of_hours as boolean) || undefined,
+      chat_id: (payload.chat_id as string) || undefined,
+      duration_ms: (payload.duration_ms as number) || undefined,
+      error_message: errorMessage || undefined,
+      custom: (payload.custom as Record<string, unknown>) || undefined,
+    },
+  }
+}
+
 export async function normalizeEvent(
   source: string,
   payload: unknown
@@ -140,9 +238,11 @@ export async function normalizeEvent(
     case 'dokploy':
       return normalizeDokploy(data)
 
+    case 'n8n':
+      return normalizeN8N(data)
+
     // Future sources — add normalizers here
     // case 'notion': return normalizeNotion(data)
-    // case 'n8n': return normalizeN8N(data)
 
     default:
       return null
