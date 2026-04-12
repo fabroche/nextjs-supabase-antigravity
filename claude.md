@@ -34,9 +34,9 @@
 **Project Name**: Next.js Supabase Dashboard  
 **Purpose**: Multi-business metrics dashboard with role-based access and OTP authentication  
 **Tech Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Development Status**: v0.7.0 — Notifications + Webhooks + Realtime live  
-**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completed), `SPRINT-2-PLAN.md` (v0.6.0 - completed), `SPRINT-3-PLAN.md` (v0.7.0 - Fases 1-3 completed)  
-**Next Step**: Sprint 3 Fases 4-5 (more normalizers, settings panel) or Sprint 4 (ticket system)
+**Development Status**: v0.8.0 — N8N Automatizaciones pipeline live (Fases 1+2 completadas)  
+**Sprint Plans**: `SPRINT-1-PLAN.md` (v0.4.0 - completado), `SPRINT-2-PLAN.md` (v0.6.0 - completado), `SPRINT-3-PLAN.md` (v0.8.0 - EN PROGRESO: Fases 1 y 2 completadas)  
+**Next Step**: Sprint 3 Fases 3-7 — Types+Queries, sidebar nav, y 3 niveles de UI `/automatizaciones`
 
 ---
 
@@ -210,7 +210,9 @@ nextjs-supabase/
 │       ├── 003_views_and_functions.sql # Views and RPC functions
 │       ├── 004_seed_data.sql          # Initial seed data
 │       ├── 005_notifications.sql      # activity_feed, notifications, Realtime
-│       └── 006_webhook_infrastructure.sql # webhook_sources, dead_letters
+│       ├── 006_webhook_infrastructure.sql # webhook_sources, dead_letters
+│       ├── 007_activity_severity.sql  # severity column en activity_feed
+│       └── 008_automatizaciones_schema.sql # n8n_instances, workflows, executions, model_pricing, custom_metrics
 ├── components.json               # shadcn/ui configuration
 ├── tsconfig.json                 # TypeScript configuration
 ├── .env.local                    # Environment variables (gitignored)
@@ -219,7 +221,7 @@ nextjs-supabase/
 ├── SPRINT-1-PLAN.md             # Sprint 1 implementation plan (v0.4.0)
 ├── SPRINT-2-PLAN.md             # Sprint 2 implementation plan (v0.5.0)
 ├── SPRINT-2-IMPLEMENTATION.md   # Sprint 2 step-by-step implementation guide
-├── SPRINT-3-PLAN.md             # Sprint 3 plan — real-time notifications
+├── SPRINT-3-PLAN.md             # Sprint 3 plan — N8N Automatizaciones Analytics (EN PROGRESO)
 └── SPRINT-4-PLAN.md             # Sprint 4 plan — ticket system
 ```
 
@@ -619,25 +621,34 @@ import { createServerClient } from "@supabase/ssr";
 | `businesses` | Business entities (1 user = N businesses) | `id`, `owner_id` (FK), `name`, `currency` |
 | `transactions` | Financial transactions — all metrics derived from this | `id`, `business_id` (FK), `customer_name`, `customer_email`, `amount`, `status`, `concept`, `category` |
 | `business_metrics_snapshot` | Daily snapshots for active users | `id`, `business_id` (FK), `active_users`, `active_now`, `snapshot_date` |
-| `activity_feed` | All webhook events from external sources | `id`, `source`, `event_type`, `actor`, `action`, `description`, `channel` |
+| `activity_feed` | All webhook events from external sources | `id`, `source`, `event_type`, `actor`, `action`, `description`, `channel`, `severity`, `business_id` (nullable FK) |
 | `notifications` | Personal notifications per user | `id`, `user_id` (FK), `source`, `action`, `description`, `read`, `read_at` |
 | `webhook_sources` | Webhook source config and secrets | `id`, `source`, `secret`, `is_active`, `config` |
 | `webhook_dead_letters` | Failed webhook processing queue | `id`, `source`, `payload`, `error`, `retries`, `resolved` |
+| `n8n_instances` | Registered N8N instances per business | `id`, `business_id` (FK), `instance_id` (external), `name`, `environment`, `api_base_url`, `api_key` |
+| `n8n_workflows` | Auto-created on first webhook per workflow | `id`, `instance_id` (FK), `workflow_id`, `name`, `is_active`, `last_seen_at` |
+| `n8n_executions` | Each N8N workflow execution with tokens+cost | `id`, `instance_id`, `workflow_id`, `execution_id` (UNIQUE), `status`, `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `is_enriched` |
+| `model_pricing` | LLM cost per 1k tokens | `model_name`, `cost_per_1k_prompt`, `cost_per_1k_completion`, `is_active` |
+| `custom_metrics` | Arbitrary KPIs per business | `id`, `business_id`, `instance_id`, `metric_key`, `metric_value`, `recorded_at` |
 
-**View**: `business_metrics` — Aggregates `transactions` to derive `total_revenue`, `revenue_change`, `sales`, `sales_change` per business (current vs previous month).
+**Views**:
+- `business_metrics` — Aggregates `transactions` for revenue/sales metrics per business
+- `n8n_instance_stats` — Aggregated execution metrics per instance (total, success, error, cost, avg duration)
+- `n8n_workflow_stats` — Aggregated execution metrics per workflow
 
 **Functions**:
 - `is_admin()` — SECURITY DEFINER helper used in all RLS policies
 - `get_user_role()` — RPC to get authenticated user's role
-- `get_monthly_chart_data(business_id, months)` — RPC for chart data (monthly revenue via `generate_series`)
+- `get_monthly_chart_data(business_id, months)` — RPC for chart data (monthly revenue)
+- `get_execution_trend(p_instance_id, p_days)` — RPC for execution trend over time (grouped by day)
 
 **Triggers**:
 - `handle_new_user` — Auto-creates `user_profiles` row on signup with `role = 'negocio'`
-- `update_updated_at` — Auto-updates `updated_at` on `user_profiles` and `businesses`
+- `update_updated_at` — Auto-updates `updated_at` on `user_profiles`, `businesses`, `n8n_instances`, `n8n_workflows`
 
 **RLS Pattern**: All tables have RLS enabled. Negocio users access only their own data (via `owner_id` or `business_id` chain). Admin users access everything via `is_admin()`.
 
-**Realtime**: `activity_feed` and `notifications` tables are added to `supabase_realtime` publication for live updates. ✅ Verified working end-to-end in production (2026-04-09) — INSERTs propagate instantly to the dashboard via WebSocket.
+**Realtime**: `activity_feed` and `notifications` tables are added to `supabase_realtime` publication for live updates. ✅ Verified working end-to-end in production (2026-04-09).
 
 **Indexes**: Composite index on `transactions(business_id, status, created_at DESC)` covers the main metrics/chart queries. Partial index on `notifications(user_id, read) WHERE read = false` for unread count.
 
@@ -648,7 +659,11 @@ supabase/migrations/
 ├── 001_foundation.sql           # is_admin(), user_profiles, handle_new_user trigger
 ├── 002_business_data.sql        # businesses, transactions, snapshots + RLS + indexes
 ├── 003_views_and_functions.sql  # business_metrics view, RPC functions
-└── 004_seed_data.sql            # Admin promotion, 3 businesses, transactions, snapshots
+├── 004_seed_data.sql            # Admin promotion, 3 businesses, transactions, snapshots
+├── 005_notifications.sql        # activity_feed, notifications, Realtime
+├── 006_webhook_infrastructure.sql # webhook_sources, dead_letters
+├── 007_activity_severity.sql    # severity column en activity_feed
+└── 008_automatizaciones_schema.sql # n8n tables, views, RPC, model_pricing seed
 ```
 
 ### Current Status
@@ -658,14 +673,85 @@ supabase/migrations/
 - ✅ Authentication system implemented
 - ✅ Protected routes configured
 - ✅ User session management active
-- ✅ Database schema designed (4 tables + 1 view + 3 functions + 2 triggers)
+- ✅ Database schema: 8 tables core + 5 tablas N8N + 3 vistas + 4 functions + 2 triggers
 - ✅ RLS policies defined for all tables
-- ✅ Migration files created
-- ✅ Migrations executed in Supabase (2026-04-05)
-- ✅ Frontend connected to real Supabase data (mock-businesses.ts deleted)
-- ✅ Hotfix: `business_metrics` view — added upper bound to current-month date filters (2026-04-05)
-- ✅ Realtime WebSocket working in production (2026-04-09) — Kong fix for Dokploy hostnames + Realtime v2 multi-tenant Host header
-- ⏳ Current seed data is for testing — metrics will change for production
+- ✅ Migrations 001–008 ejecutadas en producción
+- ✅ Frontend connected to real Supabase data
+- ✅ Realtime WebSocket working in production (2026-04-09)
+- ✅ N8N webhook pipeline funcionando en producción (2026-04-12)
+- ⚠️ PENDIENTE verificar enrichment con `gpt-4.1-mini` en producción (ver sección N8N Pipeline)
+
+---
+
+## N8N Automatizaciones Pipeline
+
+### Arquitectura del Pipeline
+
+Webhook N8N → `POST /api/webhooks/n8n` → `normalizeN8N()` → `processN8NExecution()` → DB insert → enrichment async
+
+### Archivos Clave
+
+| Archivo | Propósito |
+|---------|-----------|
+| `src/app/api/webhooks/[source]/route.ts` | Entry point + `processN8NExecution()` + `enrichExecution()` |
+| `src/lib/n8n/enrichment.ts` | Cliente API N8N — extrae tokens/modelo de `ai_languageModel` channel |
+| `src/lib/n8n/cost-calculator.ts` | Calcula costo usando `model_pricing` (cache 5min) |
+| `src/app/api/webhooks/_lib/normalizers.ts` | `normalizeN8N()` — construye `NormalizedEvent` |
+| `src/app/api/webhooks/_lib/types.ts` | `NormalizedEvent` con `business_id` opcional |
+
+### Flujo Detallado
+
+1. **Recepción**: Webhook validado con `x-n8n-webhook-secret` via `webhook_sources` tabla
+2. **Normalización**: `normalizeN8N()` extrae `instance_id`, `workflow_id`, `execution_id`, `status`, tokens del payload
+3. **Lookup instancia**: Busca `n8n_instances` por `instance_id` → obtiene `business_id` y credenciales API
+4. **Upsert workflow**: `n8n_workflows` se crea automáticamente en primer webhook
+5. **Insert execution**: `n8n_executions` con UNIQUE constraint en `(instance_id, execution_id)` — duplicados silenciados
+6. **Costo**: `calculateCost(model_name, tokens)` usando `model_pricing` table (cache en memoria 5min)
+7. **Update descripción**: Se reemplaza `$0.000` en la descripción con el costo real calculado
+8. **Activity feed**: Insert con `business_id` vinculado (visible solo al business owner)
+9. **Enrichment async**: Si la instancia tiene `api_base_url` + `api_key` → llama a N8N API `GET /api/v1/executions/{id}?includeData=true` en background
+
+### Extracción de Tokens (Estructura Real de N8N)
+
+Los tokens NO están en `data.main` sino en el canal `data.ai_languageModel`:
+```
+runData["Modelo OpenAI1"][0].data.ai_languageModel[0][0].json.tokenUsage = {
+  completionTokens: 20,
+  promptTokens: 641,
+  totalTokens: 661
+}
+```
+El modelo está en `inputOverride.ai_languageModel[0][0].json.options.model = "gpt-4.1-mini"`
+
+### Setup de Instancia N8N
+
+```sql
+-- Registrar una instancia (una sola vez por instancia de N8N)
+INSERT INTO n8n_instances (business_id, instance_id, name, environment, api_base_url, api_key)
+VALUES (
+  'UUID-DEL-BUSINESS',
+  'genzai-prod',              -- identificador arbitrario enviado en el webhook
+  'Genzai Producción',
+  'production',
+  'https://n8n.genzai.cloud',
+  'API-KEY-DE-N8N'            -- Settings > API en N8N
+);
+```
+
+### ⚠️ PENDIENTE VERIFICAR MAÑANA
+
+Después del último fix (`includeData=true` + búsqueda en `ai_languageModel`), hay que verificar en producción:
+1. Dispara un mensaje al bot de Telegram
+2. Ejecuta este query para confirmar que el enrichment funcionó:
+```sql
+SELECT execution_id, model_name, tokens_prompt, tokens_completion, cost_usd, is_enriched
+FROM n8n_executions
+ORDER BY created_at DESC
+LIMIT 5;
+```
+Debe mostrar: `model_name = "gpt-4.1-mini"`, `tokens_prompt ≈ 641`, `is_enriched = true`
+
+
 
 ---
 
@@ -954,6 +1040,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-10_  
-_Version: 0.7.1_  
-_Status: v0 Release — Dashboard + Auth + Roles + Recharts + DB Live + Reports + Notifications + Webhooks + Realtime (production-verified)_
+_Last Updated: 2026-04-12_  
+_Version: 0.8.0_  
+_Status: v0.8.0 — N8N Automatizaciones pipeline live. Fases 1+2 del Sprint 3 completadas y verificadas en producción._
