@@ -38,8 +38,6 @@ export async function fetchN8NExecutionDetail(
 
     const data = await res.json()
 
-    // N8N execution response structure varies by version
-    // Look for token usage in the execution data nodes
     const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
 
     return {
@@ -58,7 +56,10 @@ export async function fetchN8NExecutionDetail(
 
 /**
  * Extract token usage from N8N execution data.
- * Searches through node execution results for AI/LLM nodes that report tokenUsage.
+ *
+ * N8N AI/LLM sub-nodes store tokenUsage directly on item.json inside
+ * the "ai_languageModel" output channel (not "main"). The model name
+ * lives in inputOverride.ai_languageModel[*][*].json.options.model.
  */
 function extractTokenUsage(data: Record<string, unknown>): {
   tokens_prompt: number
@@ -76,32 +77,61 @@ function extractTokenUsage(data: Record<string, unknown>): {
 
     if (!nodeResults) return { tokens_prompt: 0, tokens_completion: 0, model_name: null }
 
-    // Iterate through all nodes looking for tokenUsage
     for (const nodeRuns of Object.values(nodeResults)) {
       if (!Array.isArray(nodeRuns)) continue
+
       for (const run of nodeRuns) {
         const runObj = run as Record<string, unknown>
         const outputData = runObj.data as Record<string, unknown> | undefined
-        const main = outputData?.main as unknown[][] | undefined
+        if (!outputData) continue
 
-        if (!Array.isArray(main)) continue
+        // Search ALL output channels: main, ai_languageModel, ai_memory, etc.
+        for (const channelData of Object.values(outputData)) {
+          if (!Array.isArray(channelData)) continue
 
-        for (const outputSet of main) {
-          if (!Array.isArray(outputSet)) continue
-          for (const item of outputSet) {
-            const itemObj = item as Record<string, unknown>
-            const meta = itemObj.metadata as Record<string, unknown> | undefined
-            const tokenUsage = meta?.tokenUsage as Record<string, number> | undefined
+          for (const outputSet of channelData) {
+            if (!Array.isArray(outputSet)) continue
 
-            if (tokenUsage) {
-              totalPrompt += tokenUsage.promptTokens || tokenUsage.prompt_tokens || 0
-              totalCompletion += tokenUsage.completionTokens || tokenUsage.completion_tokens || 0
+            for (const item of outputSet) {
+              const itemObj = item as Record<string, unknown>
+              const json = itemObj.json as Record<string, unknown> | undefined
+
+              // tokenUsage lives directly on json for ai_languageModel nodes
+              const tokenUsage = json?.tokenUsage as Record<string, number> | undefined
+              if (tokenUsage) {
+                totalPrompt += tokenUsage.promptTokens || tokenUsage.prompt_tokens || 0
+                totalCompletion += tokenUsage.completionTokens || tokenUsage.completion_tokens || 0
+              }
+
+              // Fallback: some node versions put it in item.metadata
+              const meta = itemObj.metadata as Record<string, unknown> | undefined
+              const metaTokens = meta?.tokenUsage as Record<string, number> | undefined
+              if (metaTokens) {
+                totalPrompt += metaTokens.promptTokens || metaTokens.prompt_tokens || 0
+                totalCompletion += metaTokens.completionTokens || metaTokens.completion_tokens || 0
+              }
             }
+          }
+        }
 
-            // Extract model name from the first AI node found
-            if (!modelName) {
-              const model = meta?.model as string | undefined
-              if (model) modelName = model
+        // Extract model from inputOverride.ai_languageModel[*][*].json.options.model
+        if (!modelName) {
+          const inputOverride = runObj.inputOverride as Record<string, unknown> | undefined
+          const aiLmSets = inputOverride?.ai_languageModel as unknown[] | undefined
+          if (Array.isArray(aiLmSets)) {
+            for (const set of aiLmSets) {
+              if (!Array.isArray(set)) continue
+              for (const items of set) {
+                if (!Array.isArray(items)) continue
+                for (const item of items) {
+                  const itemObj = item as Record<string, unknown>
+                  const json = itemObj.json as Record<string, unknown> | undefined
+                  const options = json?.options as Record<string, unknown> | undefined
+                  if (typeof options?.model === 'string') {
+                    modelName = options.model
+                  }
+                }
+              }
             }
           }
         }
