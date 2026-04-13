@@ -687,17 +687,34 @@ supabase/migrations/
 
 ### Arquitectura del Pipeline
 
-Webhook N8N → `POST /api/webhooks/n8n` → `normalizeN8N()` → `processN8NExecution()` → DB insert → enrichment async
+```
+Webhook N8N
+  → POST /api/webhooks/n8n
+  → normalizeN8N()
+  → processN8NExecution()
+      ├─ insert n8n_executions
+      ├─ insert activity_feed (con metadata.enrichment_pending=true)
+      └─ enrichExecution() [fire-and-forget]
+            ├─ fetch N8N API /executions/{id}?includeData=true
+            ├─ extract tokens + model from ai_languageModel channel
+            ├─ calculateCost() via model_pricing
+            ├─ update n8n_executions (tokens, cost, is_enriched=true)
+            └─ update activity_feed (append cost suffix + clear pending flag)
+                  → Realtime broadcasts UPDATE → dashboard merges in place
+```
 
 ### Archivos Clave
 
 | Archivo | Propósito |
 |---------|-----------|
-| `src/app/api/webhooks/[source]/route.ts` | Entry point + `processN8NExecution()` + `enrichExecution()` |
-| `src/lib/n8n/enrichment.ts` | Cliente API N8N — extrae tokens/modelo de `ai_languageModel` channel |
-| `src/lib/n8n/cost-calculator.ts` | Calcula costo usando `model_pricing` (cache 5min) |
+| `src/app/api/webhooks/[source]/route.ts` | Entry point + `processN8NExecution()` + `enrichExecution()` + `clearActivityFeedPending()` |
+| `src/lib/n8n/enrichment.ts` | Cliente API N8N — extrae tokens/modelo del canal `ai_languageModel` |
+| `src/lib/n8n/cost-calculator.ts` | Calcula costo usando `model_pricing` (cache in-memory 5min) |
 | `src/app/api/webhooks/_lib/normalizers.ts` | `normalizeN8N()` — construye `NormalizedEvent` |
 | `src/app/api/webhooks/_lib/types.ts` | `NormalizedEvent` con `business_id` opcional |
+| `src/hooks/use-activity-feed.ts` | Realtime hook — escucha INSERT + UPDATE para merge in-place |
+| `src/components/dashboard/activity-feed.tsx` | UI con skeleton + "Calculando costo…" mientras `enrichment_pending=true` |
+| `src/components/ui/skeleton.tsx` | Primitive shadcn Skeleton |
 
 ### Flujo Detallado
 
@@ -706,10 +723,10 @@ Webhook N8N → `POST /api/webhooks/n8n` → `normalizeN8N()` → `processN8NExe
 3. **Lookup instancia**: Busca `n8n_instances` por `instance_id` → obtiene `business_id` y credenciales API
 4. **Upsert workflow**: `n8n_workflows` se crea automáticamente en primer webhook
 5. **Insert execution**: `n8n_executions` con UNIQUE constraint en `(instance_id, execution_id)` — duplicados silenciados
-6. **Costo**: `calculateCost(model_name, tokens)` usando `model_pricing` table (cache en memoria 5min)
-7. **Update descripción**: Se reemplaza `$0.000` en la descripción con el costo real calculado
-8. **Activity feed**: Insert con `business_id` vinculado (visible solo al business owner)
-9. **Enrichment async**: Si la instancia tiene `api_base_url` + `api_key` → llama a N8N API `GET /api/v1/executions/{id}?includeData=true` en background
+6. **Marcar pending**: Si la instancia tiene `api_key` y `status=success`, se agrega `metadata.enrichment_pending=true` al evento antes del insert
+7. **Activity feed insert**: `business_id` vinculado (visible solo al business owner). El dashboard recibe el INSERT via Realtime y renderiza con skeleton si `enrichment_pending=true`
+8. **Enrichment async** (fire-and-forget): llama a N8N API `GET /api/v1/executions/{id}?includeData=true`, extrae tokens del canal `ai_languageModel`, calcula costo
+9. **Update final** (siempre, success o fail — try/finally): update `n8n_executions` con tokens+cost, update `activity_feed.description` con sufijo `(X tokens, $Y.YYYY)` y `metadata.enrichment_pending=false`. El dashboard merge el UPDATE in-place → skeleton desaparece, aparece el costo real
 
 ### Extracción de Tokens (Estructura Real de N8N)
 
@@ -721,7 +738,13 @@ runData["Modelo OpenAI1"][0].data.ai_languageModel[0][0].json.tokenUsage = {
   totalTokens: 661
 }
 ```
-El modelo está en `inputOverride.ai_languageModel[0][0].json.options.model = "gpt-4.1-mini"`
+El modelo está en `inputOverride.ai_languageModel[0][0].json.options.model = "gpt-4.1-mini"`.
+
+**Nota estructural**: son 2 niveles de array (`[0][0]`) terminando en un objeto con `.json`, no 3. Cualquier loop adicional rompe la extracción.
+
+### Requisito crítico: `REPLICA IDENTITY FULL`
+
+Supabase Realtime requiere `REPLICA IDENTITY FULL` en tablas con RLS para emitir eventos UPDATE — sin eso, los UPDATEs se descartan silenciosamente en el broadcast (los INSERTs funcionan bien igual). La migración **009_activity_feed_replica_identity.sql** aplica esto a `activity_feed` + `notifications`. Sin esta migración, el skeleton se queda colgado hasta que el usuario recargue la página.
 
 ### Setup de Instancia N8N
 
@@ -738,18 +761,21 @@ VALUES (
 );
 ```
 
-### ⚠️ PENDIENTE VERIFICAR MAÑANA
+### Escape timer del frontend
 
-Después del último fix (`includeData=true` + búsqueda en `ai_languageModel`), hay que verificar en producción:
-1. Dispara un mensaje al bot de Telegram
-2. Ejecuta este query para confirmar que el enrichment funcionó:
-```sql
-SELECT execution_id, model_name, tokens_prompt, tokens_completion, cost_usd, is_enriched
-FROM n8n_executions
-ORDER BY created_at DESC
-LIMIT 5;
-```
-Debe mostrar: `model_name = "gpt-4.1-mini"`, `tokens_prompt ≈ 641`, `is_enriched = true`
+El skeleton tiene un timer de escape de **15 segundos** por evento. Si el UPDATE del enrichment nunca llega (silent Realtime drop, bug en backend, timeout del fetch a N8N API), el skeleton desaparece solo para evitar estados colgados. Implementado en `useEnrichmentEscape()` dentro de `activity-feed.tsx`.
+
+### 🔮 Cambio futuro planeado: tokens directo en el payload de N8N
+
+El colaborador del lado N8N está trabajando en un **Code node** que extraerá `tokenUsage` del sub-nodo del modelo y lo inyectará directamente en el payload del HTTP Request. Cuando los workflows se migren a esa versión, el pipeline se simplificará significativamente:
+
+- `normalizeN8N()` ya lee `tokens_prompt`/`tokens_completion`/`cost_usd` del payload — no requiere cambio
+- `processN8NExecution()` debe chequear `if (tokensPrompt > 0)` → path directo sin enrichment
+- Los workflows legacy siguen funcionando por el path actual (fallback automático, sin breaking change)
+- Una vez que todos los workflows estén migrados, se puede eliminar `fetchN8NExecutionDetail`, `enrichExecution`, el flag `enrichment_pending`, y el skeleton UI
+- Recomendable mantener el UPDATE listener en `useActivityFeed` como primitiva defensiva para otras fuentes futuras
+
+**Beneficio a escala** (500+ msg/min): elimina 1 HTTP call a N8N API + 2 SELECT + 2 UPDATE por mensaje → ~5x menos I/O.
 
 
 
@@ -1040,6 +1066,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-12_  
-_Version: 0.8.0_  
-_Status: v0.8.0 — N8N Automatizaciones pipeline live. Fases 1+2 del Sprint 3 completadas y verificadas en producción._
+_Last Updated: 2026-04-13_  
+_Version: 0.8.1_  
+_Status: v0.8.1 — N8N pipeline + skeleton UX completo. Enrichment async con flag `metadata.enrichment_pending`, migración 009 (REPLICA IDENTITY FULL) aplicada. Sprint 3 Fases 1+2 verificadas en producción. Próximo: Fases 3-7 (types, queries, sidebar nav, UI `/automatizaciones`). Cambio futuro planeado: tokens directo en payload de N8N (Code node en desarrollo del lado N8N)._
