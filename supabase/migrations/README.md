@@ -18,6 +18,9 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 4 | `004_seed_data.sql` | Promotes admin, inserts 3 test businesses, transactions (recent + historical), and metric snapshots |
 | 5 | `005_notifications.sql` | `activity_feed`, `notifications` tables, RLS policies, Supabase Realtime publication |
 | 6 | `006_webhook_infrastructure.sql` | `webhook_sources`, `webhook_dead_letters` tables, seed 4 sources, `telegram_id`/`notion_person_id` columns on `user_profiles` |
+| 7 | `007_activity_severity.sql` | Adds `severity` column to `activity_feed` for color-coded UI (success/warning/error/null) |
+| 8 | `008_automatizaciones_schema.sql` | N8N analytics: `n8n_instances`, `n8n_workflows`, `n8n_executions`, `model_pricing`, `custom_metrics`, views, RPC, seed pricing. Adds `business_id` to `activity_feed` |
+| 9 | `009_activity_feed_replica_identity.sql` | `REPLICA IDENTITY FULL` on `activity_feed` + `notifications` so Supabase Realtime broadcasts UPDATE events under RLS |
 
 ---
 
@@ -161,7 +164,10 @@ The admin user is configured as `genzai.cloud@gmail.com` in both:
 | 2026-04-05 | Hotfix: business_metrics view | Applied in SQL Editor | Added upper bound `< date_trunc('month', now()) + INTERVAL '1 month'` to all current-month FILTER clauses. Bug: future months' transactions were included in current month totals. Migration file `003` updated to match. |
 | 2026-04-08 | 005_notifications.sql | Executed | activity_feed + notifications tables, RLS, Realtime publication verified |
 | 2026-04-08 | 006_webhook_infrastructure.sql | Executed | webhook_sources + dead_letters, 4 sources seeded, user_profiles extended |
+| 2026-04-09 | 007_activity_severity.sql | Executed | severity column on activity_feed for color-coded events |
+| 2026-04-12 | 008_automatizaciones_schema.sql | Executed | N8N analytics schema (5 tables + 2 views + 1 RPC + model pricing seed), activity_feed.business_id |
+| 2026-04-13 | 009_activity_feed_replica_identity.sql | Executed | REPLICA IDENTITY FULL on activity_feed + notifications. Required for Realtime to broadcast UPDATE events on RLS-enabled tables. Fixes enrichment UPDATEs not reaching the dashboard |
 
 ---
 
-_Last Updated: 2026-04-08_
+_Last Updated: 2026-04-13_

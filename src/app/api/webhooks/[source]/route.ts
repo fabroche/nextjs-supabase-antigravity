@@ -216,7 +216,11 @@ async function processN8NExecution(
   }
 
   // 7. Async enrichment (non-blocking) — only if instance has API credentials
-  if (instance.api_base_url && instance.api_key && rawExecutionId && execution) {
+  // AND this is a success execution (errors have no tokens to fetch).
+  // Marks the event as pending so the dashboard renders a skeleton until
+  // enrichment finishes; the flag is cleared in enrichExecution's finally.
+  if (instance.api_base_url && instance.api_key && rawExecutionId && execution && status === 'success') {
+    event.metadata = { ...(event.metadata ?? {}), enrichment_pending: true }
     enrichExecution(
       instance.api_base_url,
       instance.api_key,
@@ -227,8 +231,10 @@ async function processN8NExecution(
 }
 
 /**
- * Background enrichment: fetch full execution data from N8N API
- * and update the execution row with tokens, model, and cost.
+ * Background enrichment: fetch full execution data from N8N API,
+ * update the execution row with tokens/model/cost, and clear the
+ * enrichment_pending flag on the corresponding activity_feed row
+ * (always — even on failure — so the frontend skeleton disappears).
  */
 async function enrichExecution(
   apiBaseUrl: string,
@@ -236,55 +242,78 @@ async function enrichExecution(
   n8nExecutionId: string,
   dbExecutionId: string
 ) {
-  const detail = await fetchN8NExecutionDetail(apiBaseUrl, apiKey, n8nExecutionId)
-  if (!detail) return
+  let totalTokens = 0
+  let finalCost = 0
 
-  // Only update if we got useful data
-  if (detail.tokens_prompt === 0 && detail.tokens_completion === 0 && !detail.model_name) {
-    return
+  try {
+    const detail = await fetchN8NExecutionDetail(apiBaseUrl, apiKey, n8nExecutionId)
+    if (detail && (detail.tokens_prompt > 0 || detail.tokens_completion > 0 || detail.model_name)) {
+      finalCost = await calculateCost(detail.model_name, detail.tokens_prompt, detail.tokens_completion)
+      totalTokens = detail.tokens_prompt + detail.tokens_completion
+
+      await getSupabaseAdmin()
+        .from('n8n_executions')
+        .update({
+          tokens_prompt: detail.tokens_prompt,
+          tokens_completion: detail.tokens_completion,
+          model_name: detail.model_name,
+          cost_usd: finalCost,
+          duration_ms: detail.duration_ms,
+          is_enriched: true,
+        })
+        .eq('id', dbExecutionId)
+    }
+  } catch (err) {
+    console.warn('[n8n-enrichment] fetch/update failed:', err)
+  } finally {
+    // Always clear the pending flag — even on failure — so the frontend
+    // skeleton goes away. The UPDATE propagates via Realtime (requires
+    // REPLICA IDENTITY FULL on activity_feed, see migration 009).
+    await clearActivityFeedPending(n8nExecutionId, totalTokens, finalCost).catch((err) =>
+      console.warn('[n8n-enrichment] failed to clear pending flag:', err)
+    )
+  }
+}
+
+/**
+ * Locate the activity_feed row matching the n8n execution and:
+ *   - append the cost suffix to the description (if we have tokens/cost)
+ *   - set metadata.enrichment_pending = false
+ * Both updates happen in a single UPDATE to minimise Realtime churn.
+ */
+async function clearActivityFeedPending(
+  n8nExecutionId: string,
+  totalTokens: number,
+  cost: number
+) {
+  const supabase = getSupabaseAdmin()
+  const { data: feedRow } = await supabase
+    .from('activity_feed')
+    .select('id, description, metadata')
+    .eq('source', 'n8n')
+    .eq('metadata->>execution_id', n8nExecutionId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!feedRow) return
+
+  let newDescription = feedRow.description
+  if (totalTokens > 0 && cost > 0) {
+    const costSuffix = ` (${totalTokens.toLocaleString()} tokens, $${cost.toFixed(4)})`
+    const hasSuffix = /\(\d[\d,]* tokens, \$[\d.]+\)/.test(feedRow.description)
+    newDescription = hasSuffix
+      ? feedRow.description.replace(/\(\d[\d,]* tokens, \$[\d.]+\)/, costSuffix.trim())
+      : feedRow.description + costSuffix
   }
 
-  const cost = await calculateCost(detail.model_name, detail.tokens_prompt, detail.tokens_completion)
-  const supabase = getSupabaseAdmin()
+  const newMetadata = {
+    ...(feedRow.metadata as Record<string, unknown> | null ?? {}),
+    enrichment_pending: false,
+  }
 
   await supabase
-    .from('n8n_executions')
-    .update({
-      tokens_prompt: detail.tokens_prompt,
-      tokens_completion: detail.tokens_completion,
-      model_name: detail.model_name,
-      cost_usd: cost,
-      duration_ms: detail.duration_ms,
-      is_enriched: true,
-    })
-    .eq('id', dbExecutionId)
-
-  // Update the corresponding activity_feed row's description with the real
-  // tokens + cost now that enrichment is complete. The initial webhook arrives
-  // with tokens=0, so the description was built without that suffix.
-  const totalTokens = detail.tokens_prompt + detail.tokens_completion
-  if (totalTokens > 0) {
-    const { data: feedRow } = await supabase
-      .from('activity_feed')
-      .select('id, description')
-      .eq('source', 'n8n')
-      .eq('metadata->>execution_id', n8nExecutionId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (feedRow) {
-      const costSuffix = ` (${totalTokens.toLocaleString()} tokens, $${cost.toFixed(4)})`
-      // Replace existing suffix if present, otherwise append
-      const hasSuffix = /\(\d[\d,]* tokens, \$[\d.]+\)/.test(feedRow.description)
-      const newDescription = hasSuffix
-        ? feedRow.description.replace(/\(\d[\d,]* tokens, \$[\d.]+\)/, costSuffix.trim())
-        : feedRow.description + costSuffix
-
-      await supabase
-        .from('activity_feed')
-        .update({ description: newDescription })
-        .eq('id', feedRow.id)
-    }
-  }
+    .from('activity_feed')
+    .update({ description: newDescription, metadata: newMetadata })
+    .eq('id', feedRow.id)
 }
