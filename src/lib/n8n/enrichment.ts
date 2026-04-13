@@ -114,22 +114,20 @@ function extractTokenUsage(data: Record<string, unknown>): {
           }
         }
 
-        // Extract model from inputOverride.ai_languageModel[*][*].json.options.model
+        // Extract model from inputOverride.ai_languageModel[0][0].json.options.model
+        // Structure: 2 levels of arrays → object with .json.options.model
         if (!modelName) {
           const inputOverride = runObj.inputOverride as Record<string, unknown> | undefined
           const aiLmSets = inputOverride?.ai_languageModel as unknown[] | undefined
           if (Array.isArray(aiLmSets)) {
             for (const set of aiLmSets) {
               if (!Array.isArray(set)) continue
-              for (const items of set) {
-                if (!Array.isArray(items)) continue
-                for (const item of items) {
-                  const itemObj = item as Record<string, unknown>
-                  const json = itemObj.json as Record<string, unknown> | undefined
-                  const options = json?.options as Record<string, unknown> | undefined
-                  if (typeof options?.model === 'string') {
-                    modelName = options.model
-                  }
+              for (const item of set) {
+                const itemObj = item as Record<string, unknown>
+                const json = itemObj.json as Record<string, unknown> | undefined
+                const options = json?.options as Record<string, unknown> | undefined
+                if (typeof options?.model === 'string') {
+                  modelName = options.model
                 }
               }
             }

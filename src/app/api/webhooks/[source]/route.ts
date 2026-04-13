@@ -245,8 +245,9 @@ async function enrichExecution(
   }
 
   const cost = await calculateCost(detail.model_name, detail.tokens_prompt, detail.tokens_completion)
+  const supabase = getSupabaseAdmin()
 
-  await getSupabaseAdmin()
+  await supabase
     .from('n8n_executions')
     .update({
       tokens_prompt: detail.tokens_prompt,
@@ -257,4 +258,33 @@ async function enrichExecution(
       is_enriched: true,
     })
     .eq('id', dbExecutionId)
+
+  // Update the corresponding activity_feed row's description with the real
+  // tokens + cost now that enrichment is complete. The initial webhook arrives
+  // with tokens=0, so the description was built without that suffix.
+  const totalTokens = detail.tokens_prompt + detail.tokens_completion
+  if (totalTokens > 0) {
+    const { data: feedRow } = await supabase
+      .from('activity_feed')
+      .select('id, description')
+      .eq('source', 'n8n')
+      .eq('metadata->>execution_id', n8nExecutionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (feedRow) {
+      const costSuffix = ` (${totalTokens.toLocaleString()} tokens, $${cost.toFixed(4)})`
+      // Replace existing suffix if present, otherwise append
+      const hasSuffix = /\(\d[\d,]* tokens, \$[\d.]+\)/.test(feedRow.description)
+      const newDescription = hasSuffix
+        ? feedRow.description.replace(/\(\d[\d,]* tokens, \$[\d.]+\)/, costSuffix.trim())
+        : feedRow.description + costSuffix
+
+      await supabase
+        .from('activity_feed')
+        .update({ description: newDescription })
+        .eq('id', feedRow.id)
+    }
+  }
 }
