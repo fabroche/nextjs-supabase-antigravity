@@ -39,37 +39,22 @@ export async function fetchN8NExecutionDetail(
     const data = await res.json()
 
     // TEMP DEBUG — remove after diagnosis
-    try {
-      const d = data as Record<string, unknown> & {
-        data?: { resultData?: { runData?: Record<string, unknown[]> } }
-      }
-      const runData = d.data?.resultData?.runData ?? {}
-      for (const [nodeName, runs] of Object.entries(runData)) {
-        if (!Array.isArray(runs)) continue
-        for (const run of runs) {
-          const r = run as Record<string, unknown>
-          const channels = r.data ? Object.keys(r.data as object) : []
-          console.log(`[n8n-debug] node="${nodeName}" channels=[${channels.join(',')}]`)
-          for (const [ch, chData] of Object.entries((r.data ?? {}) as Record<string, unknown>)) {
-            if (!Array.isArray(chData)) continue
-            for (const set of chData) {
-              if (!Array.isArray(set)) continue
-              for (const item of set) {
-                const it = item as Record<string, unknown>
-                const j = it.json as Record<string, unknown> | undefined
-                if (j?.tokenUsage) console.log(`[n8n-debug] FOUND tokenUsage in node="${nodeName}" ch="${ch}"`, JSON.stringify(j.tokenUsage))
-                const meta = it.metadata as Record<string, unknown> | undefined
-                if (meta?.tokenUsage) console.log(`[n8n-debug] FOUND metadata.tokenUsage in node="${nodeName}" ch="${ch}"`, JSON.stringify(meta.tokenUsage))
-              }
-            }
-          }
-          if (r.inputOverride) {
-            const io = r.inputOverride as Record<string, unknown>
-            if (io.ai_languageModel) console.log(`[n8n-debug] node="${nodeName}" has inputOverride.ai_languageModel`)
-          }
+    const d = data as Record<string, unknown> & {
+      data?: { resultData?: { runData?: Record<string, unknown> } }
+    }
+    const runData = d.data?.resultData?.runData
+    console.log('[n8n-debug] runData keys:', runData ? Object.keys(runData).join(' | ') : 'MISSING')
+    if (runData) {
+      const firstNodeKey = Object.keys(runData)[0]
+      if (firstNodeKey) {
+        const firstRuns = runData[firstNodeKey]
+        const firstRun = Array.isArray(firstRuns) ? (firstRuns[0] as Record<string, unknown>) : null
+        console.log('[n8n-debug] first node:', firstNodeKey, '— run keys:', firstRun ? Object.keys(firstRun).join(',') : 'none')
+        if (firstRun?.data) {
+          console.log('[n8n-debug] first node output channels:', Object.keys(firstRun.data as object).join(','))
         }
       }
-    } catch { /* ignore debug errors */ }
+    }
 
     const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
 
