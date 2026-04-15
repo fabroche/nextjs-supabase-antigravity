@@ -679,7 +679,7 @@ supabase/migrations/
 - ✅ Frontend connected to real Supabase data
 - ✅ Realtime WebSocket working in production (2026-04-09)
 - ✅ N8N webhook pipeline funcionando en producción (2026-04-12)
-- ⚠️ PENDIENTE verificar enrichment con `gpt-4.1-mini` en producción (ver sección N8N Pipeline)
+- ✅ Enrichment con `gpt-4.1-mini` verificado en producción (2026-04-15) — tokens y costo aparecen en dashboard
 
 ---
 
@@ -725,7 +725,7 @@ Webhook N8N
 5. **Insert execution**: `n8n_executions` con UNIQUE constraint en `(instance_id, execution_id)` — duplicados silenciados
 6. **Marcar pending**: Si la instancia tiene `api_key` y `status=success`, se agrega `metadata.enrichment_pending=true` al evento antes del insert
 7. **Activity feed insert**: `business_id` vinculado (visible solo al business owner). El dashboard recibe el INSERT via Realtime y renderiza con skeleton si `enrichment_pending=true`
-8. **Enrichment async** (fire-and-forget): llama a N8N API `GET /api/v1/executions/{id}?includeData=true`, extrae tokens del canal `ai_languageModel`, calcula costo
+8. **Enrichment async** (fire-and-forget): llama a N8N API `GET /api/v1/executions/{id}?includeData=true` con **polling** — N8N dispara el webhook antes de que el workflow termine (los AI nodes siguen ejecutando), por eso se hace polling con intervalos de 4s hasta que `data.finished === true` (máx 5 reintentos, ~60s ventana). Luego extrae tokens del canal `ai_languageModel`, calcula costo
 9. **Update final** (siempre, success o fail — try/finally): update `n8n_executions` con tokens+cost, update `activity_feed.description` con sufijo `(X tokens, $Y.YYYY)` y `metadata.enrichment_pending=false`. El dashboard merge el UPDATE in-place → skeleton desaparece, aparece el costo real
 
 ### Extracción de Tokens (Estructura Real de N8N)
@@ -1066,6 +1066,6 @@ className = "bg-destructive text-destructive-foreground";
 
 ---
 
-_Last Updated: 2026-04-13_  
-_Version: 0.8.1_  
-_Status: v0.8.1 — N8N pipeline + skeleton UX completo. Enrichment async con flag `metadata.enrichment_pending`, migración 009 (REPLICA IDENTITY FULL) aplicada. Sprint 3 Fases 1+2 verificadas en producción. Próximo: Fases 3-7 (types, queries, sidebar nav, UI `/automatizaciones`). Cambio futuro planeado: tokens directo en payload de N8N (Code node en desarrollo del lado N8N)._
+_Last Updated: 2026-04-15_  
+_Version: 0.8.2_  
+_Status: v0.8.2 — N8N enrichment completamente verificado en producción. Root cause resuelto: N8N dispara el webhook mid-execution (antes de que los AI nodes terminen), fix con polling hasta `finished=true` (4s × 5 reintentos). Sprint 3 Fase 3 completada (types + queries). Próximo: Fases 4-7 (sidebar nav, UI `/automatizaciones`). Cambio futuro planeado: tokens directo en payload de N8N (Code node en desarrollo)._
