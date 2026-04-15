@@ -39,22 +39,15 @@ export async function fetchN8NExecutionDetail(
     const data = await res.json()
 
     // TEMP DEBUG — remove after diagnosis
-    const d = data as Record<string, unknown> & {
-      data?: { resultData?: { runData?: Record<string, unknown> } }
-    }
-    const runData = d.data?.resultData?.runData
-    console.log('[n8n-debug] runData keys:', runData ? Object.keys(runData).join(' | ') : 'MISSING')
-    if (runData) {
-      const firstNodeKey = Object.keys(runData)[0]
-      if (firstNodeKey) {
-        const firstRuns = runData[firstNodeKey]
-        const firstRun = Array.isArray(firstRuns) ? (firstRuns[0] as Record<string, unknown>) : null
-        console.log('[n8n-debug] first node:', firstNodeKey, '— run keys:', firstRun ? Object.keys(firstRun).join(',') : 'none')
-        if (firstRun?.data) {
-          console.log('[n8n-debug] first node output channels:', Object.keys(firstRun.data as object).join(','))
-        }
-      }
-    }
+    const d = data as Record<string, unknown>
+    const innerData = d.data as Record<string, unknown> | undefined
+    console.log('[n8n-debug] data keys:', innerData ? Object.keys(innerData).join(',') : 'null')
+    const resultData = innerData?.resultData as Record<string, unknown> | undefined
+    console.log('[n8n-debug] resultData keys:', resultData ? Object.keys(resultData).join(',') : 'null')
+    const runData = resultData?.runData as Record<string, unknown> | undefined
+    console.log('[n8n-debug] runData node count:', runData ? Object.keys(runData).length : 'null')
+    // Dump first 600 chars of data to see full shape
+    console.log('[n8n-debug] raw data (truncated):', JSON.stringify(innerData).slice(0, 600))
 
     const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
 
