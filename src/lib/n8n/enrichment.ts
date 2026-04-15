@@ -39,9 +39,37 @@ export async function fetchN8NExecutionDetail(
     const data = await res.json()
 
     // TEMP DEBUG — remove after diagnosis
-    const hasData = !!(data as Record<string, unknown>).data
-    const hasRunData = !!(data as Record<string, unknown> & { data?: { resultData?: { runData?: unknown } } })?.data?.resultData?.runData
-    console.log(`[n8n-enrichment] exec=${executionId} hasData=${hasData} hasRunData=${hasRunData} topKeys=${Object.keys(data as object).join(',')}`)
+    try {
+      const d = data as Record<string, unknown> & {
+        data?: { resultData?: { runData?: Record<string, unknown[]> } }
+      }
+      const runData = d.data?.resultData?.runData ?? {}
+      for (const [nodeName, runs] of Object.entries(runData)) {
+        if (!Array.isArray(runs)) continue
+        for (const run of runs) {
+          const r = run as Record<string, unknown>
+          const channels = r.data ? Object.keys(r.data as object) : []
+          console.log(`[n8n-debug] node="${nodeName}" channels=[${channels.join(',')}]`)
+          for (const [ch, chData] of Object.entries((r.data ?? {}) as Record<string, unknown>)) {
+            if (!Array.isArray(chData)) continue
+            for (const set of chData) {
+              if (!Array.isArray(set)) continue
+              for (const item of set) {
+                const it = item as Record<string, unknown>
+                const j = it.json as Record<string, unknown> | undefined
+                if (j?.tokenUsage) console.log(`[n8n-debug] FOUND tokenUsage in node="${nodeName}" ch="${ch}"`, JSON.stringify(j.tokenUsage))
+                const meta = it.metadata as Record<string, unknown> | undefined
+                if (meta?.tokenUsage) console.log(`[n8n-debug] FOUND metadata.tokenUsage in node="${nodeName}" ch="${ch}"`, JSON.stringify(meta.tokenUsage))
+              }
+            }
+          }
+          if (r.inputOverride) {
+            const io = r.inputOverride as Record<string, unknown>
+            if (io.ai_languageModel) console.log(`[n8n-debug] node="${nodeName}" has inputOverride.ai_languageModel`)
+          }
+        }
+      }
+    } catch { /* ignore debug errors */ }
 
     const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
 
