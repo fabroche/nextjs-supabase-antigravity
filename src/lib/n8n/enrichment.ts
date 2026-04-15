@@ -38,6 +38,11 @@ export async function fetchN8NExecutionDetail(
 
     const data = await res.json()
 
+    // TEMP DEBUG — remove after diagnosis
+    const hasData = !!(data as Record<string, unknown>).data
+    const hasRunData = !!(data as Record<string, unknown> & { data?: { resultData?: { runData?: unknown } } })?.data?.resultData?.runData
+    console.log(`[n8n-enrichment] exec=${executionId} hasData=${hasData} hasRunData=${hasRunData} topKeys=${Object.keys(data as object).join(',')}`)
+
     const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
 
     return {
