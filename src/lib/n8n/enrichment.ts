@@ -16,53 +16,57 @@ interface N8NExecutionDetail {
  * Returns null if the instance has no API credentials or the request fails.
  * This is non-blocking — enrichment failure should never break the pipeline.
  */
+// Poll interval schedule: 4s, 8s, 12s, 16s, 20s (max ~60s total wait)
+const POLL_DELAYS_MS = [4_000, 4_000, 4_000, 4_000, 4_000]
+
 export async function fetchN8NExecutionDetail(
   apiBaseUrl: string,
   apiKey: string,
   executionId: string
 ): Promise<N8NExecutionDetail | null> {
-  try {
-    const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/executions/${executionId}?includeData=true`
-    const res = await fetch(url, {
-      headers: {
-        'X-N8N-API-KEY': apiKey,
-        'Accept': 'application/json',
-      },
-      signal: AbortSignal.timeout(10_000), // 10s timeout
-    })
+  const url = `${apiBaseUrl.replace(/\/$/, '')}/api/v1/executions/${executionId}?includeData=true`
+  const headers = { 'X-N8N-API-KEY': apiKey, 'Accept': 'application/json' }
 
-    if (!res.ok) {
-      console.warn(`[n8n-enrichment] API returned ${res.status} for execution ${executionId}`)
-      return null
+  // N8N fires the webhook mid-execution (before AI nodes finish).
+  // Poll until finished=true, up to 5 retries (~60s window).
+  for (let attempt = 0; attempt <= POLL_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, POLL_DELAYS_MS[attempt - 1]))
     }
 
-    const data = await res.json()
+    try {
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) })
 
-    // TEMP DEBUG — remove after diagnosis
-    const d = data as Record<string, unknown>
-    const innerData = d.data as Record<string, unknown> | undefined
-    console.log('[n8n-debug] data keys:', innerData ? Object.keys(innerData).join(',') : 'null')
-    const resultData = innerData?.resultData as Record<string, unknown> | undefined
-    console.log('[n8n-debug] resultData keys:', resultData ? Object.keys(resultData).join(',') : 'null')
-    const runData = resultData?.runData as Record<string, unknown> | undefined
-    console.log('[n8n-debug] runData node count:', runData ? Object.keys(runData).length : 'null')
-    // Dump first 600 chars of data to see full shape
-    console.log('[n8n-debug] raw data (truncated):', JSON.stringify(innerData).slice(0, 600))
+      if (!res.ok) {
+        console.warn(`[n8n-enrichment] API returned ${res.status} for execution ${executionId}`)
+        return null
+      }
 
-    const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
+      const data = await res.json() as Record<string, unknown>
 
-    return {
-      tokens_prompt,
-      tokens_completion,
-      model_name,
-      duration_ms: typeof data.stoppedAt === 'string' && typeof data.startedAt === 'string'
-        ? new Date(data.stoppedAt).getTime() - new Date(data.startedAt).getTime()
-        : null,
+      if (data.finished === false) {
+        console.log(`[n8n-enrichment] exec=${executionId} not finished yet — retry ${attempt + 1}/${POLL_DELAYS_MS.length}`)
+        continue
+      }
+
+      const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
+      return {
+        tokens_prompt,
+        tokens_completion,
+        model_name,
+        duration_ms:
+          typeof data.stoppedAt === 'string' && typeof data.startedAt === 'string'
+            ? new Date(data.stoppedAt).getTime() - new Date(data.startedAt).getTime()
+            : null,
+      }
+    } catch (error) {
+      console.warn(`[n8n-enrichment] Failed to fetch execution ${executionId} (attempt ${attempt + 1}):`, error)
+      if (attempt === POLL_DELAYS_MS.length) return null
     }
-  } catch (error) {
-    console.warn(`[n8n-enrichment] Failed to fetch execution ${executionId}:`, error)
-    return null
   }
+
+  console.warn(`[n8n-enrichment] exec=${executionId} did not finish within polling window`)
+  return null
 }
 
 /**
