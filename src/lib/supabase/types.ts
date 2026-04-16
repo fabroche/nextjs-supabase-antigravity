@@ -68,6 +68,28 @@ export interface DbActivityFeed {
   created_at: string
 }
 
+// Table: webhook_dead_letters
+export interface DbDeadLetter {
+  id: string
+  source: string
+  payload: Record<string, unknown>
+  error: string | null
+  headers: Record<string, unknown> | null
+  retries: number
+  resolved: boolean
+  created_at: string
+}
+
+// Table: user_profiles (subset of columns relevant to settings)
+export interface DbUserProfile {
+  id: string
+  full_name: string | null
+  role: 'admin' | 'negocio'
+  telegram_id: string | null
+  notion_person_id: string | null
+  updated_at: string
+}
+
 // Table: notifications
 export interface DbNotification {
   id: string

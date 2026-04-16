@@ -7,6 +7,8 @@ import type {
   DbChartData,
   DbActivityFeed,
   DbNotification,
+  DbDeadLetter,
+  DbUserProfile,
   DbN8NInstance,
   DbN8NWorkflow,
   DbN8NExecution,
@@ -112,16 +114,72 @@ export async function fetchTransactionsByDateRange(
   return data || []
 }
 
-// Get recent activity feed events
-export async function fetchActivityFeed(limit = 50): Promise<DbActivityFeed[]> {
+// Get recent activity feed events with optional source filter and pagination
+export async function fetchActivityFeed(
+  limit = 20,
+  offset = 0,
+  source?: string,
+): Promise<DbActivityFeed[]> {
   const supabase = createClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('activity_feed')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
+  if (source) query = query.eq('source', source)
+  const { data, error } = await query
   if (error) throw error
   return data || []
+}
+
+// Current user's profile (for settings)
+export async function fetchUserProfile(): Promise<DbUserProfile | null> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('id, full_name, role, telegram_id, notion_person_id, updated_at')
+    .eq('id', user.id)
+    .single()
+  if (error) throw error
+  return data
+}
+
+// Update current user's profile fields
+export async function updateUserProfile(
+  updates: Partial<Pick<DbUserProfile, 'full_name' | 'telegram_id' | 'notion_person_id'>>
+): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('user_profiles')
+    .update(updates)
+    .eq('id', user.id)
+  if (error) throw error
+}
+
+// Dead letters (admin only — RLS not yet set, relies on app-level guard)
+export async function fetchDeadLetters(resolved = false): Promise<DbDeadLetter[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('webhook_dead_letters')
+    .select('*')
+    .eq('resolved', resolved)
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (error) throw error
+  return data || []
+}
+
+export async function resolveDeadLetter(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('webhook_dead_letters')
+    .update({ resolved: true })
+    .eq('id', id)
+  if (error) throw error
 }
 
 // Get notifications for a user

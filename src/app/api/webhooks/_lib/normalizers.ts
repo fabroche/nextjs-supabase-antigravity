@@ -40,6 +40,9 @@ function getMediaLabel(message: Record<string, unknown>): string | null {
   if (message.audio) return '🎵 Audio'
   if (message.voice) return '🎤 Nota de voz'
   if (message.video_note) return '🎥 Video nota'
+  if (message.video_chat_started) return '📹 Videollamada iniciada'
+  if (message.video_chat_ended) return '📹 Videollamada finalizada'
+  if (message.video_chat_participants_invited) return '📹 Participantes invitados a videollamada'
   if (message.sticker) {
     const sticker = message.sticker as Record<string, unknown>
     return `🏷️ Sticker${sticker.emoji ? ` ${sticker.emoji}` : ''}`

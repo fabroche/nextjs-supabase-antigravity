@@ -8,24 +8,54 @@ import {
   ChevronLeft,
   Menu,
   Zap,
+  Settings,
+  ShieldAlert,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { useBusiness } from "@/contexts/business-context"
 
-const sidebarNav = [
-  {
-    title: "Dashboard",
-    href: "/",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Automatizaciones",
-    href: "/automatizaciones",
-    icon: Zap,
-  },
+const mainNav = [
+  { title: "Dashboard", href: "/", icon: LayoutDashboard },
+  { title: "Automatizaciones", href: "/automatizaciones", icon: Zap },
 ]
+
+const settingsNav = [
+  { title: "Ajustes", href: "/settings", icon: Settings },
+]
+
+const adminNav = [
+  { title: "Dead Letters", href: "/admin/dead-letters", icon: ShieldAlert },
+]
+
+function NavItem({
+  item,
+  isActive,
+  collapsed,
+}: {
+  item: { title: string; href: string; icon: React.ElementType }
+  isActive: boolean
+  collapsed?: boolean
+}) {
+  const Icon = item.icon
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        isActive
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        collapsed && "justify-center"
+      )}
+    >
+      <Icon className="h-5 w-5 shrink-0" />
+      {!collapsed && <span>{item.title}</span>}
+    </Link>
+  )
+}
 
 interface SidebarProps {
   className?: string
@@ -34,6 +64,11 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const [collapsed, setCollapsed] = React.useState(false)
   const pathname = usePathname()
+  const { isAdmin } = useBusiness()
+
+  function isActive(href: string) {
+    return href === "/" ? pathname === "/" : pathname.startsWith(href)
+  }
 
   return (
     <aside
@@ -65,28 +100,49 @@ export function Sidebar({ className }: SidebarProps) {
         </Button>
       </div>
 
-      <nav className="flex-1 space-y-1 p-2">
-        {sidebarNav.map((item) => {
-          const Icon = item.icon
-          const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+      <nav className="flex-1 p-2 space-y-0.5">
+        {mainNav.map((item) => (
+          <NavItem
+            key={item.href}
+            item={item}
+            isActive={isActive(item.href)}
+            collapsed={collapsed}
+          />
+        ))}
 
-          return (
-            <Link
+        <div className={cn("pt-3", !collapsed && "border-t mt-3")}>
+          {!collapsed && (
+            <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+              Cuenta
+            </p>
+          )}
+          {settingsNav.map((item) => (
+            <NavItem
               key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                collapsed && "justify-center"
-              )}
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              {!collapsed && <span>{item.title}</span>}
-            </Link>
-          )
-        })}
+              item={item}
+              isActive={isActive(item.href)}
+              collapsed={collapsed}
+            />
+          ))}
+        </div>
+
+        {isAdmin && (
+          <div className={cn("pt-3", !collapsed && "border-t mt-3")}>
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                Admin
+              </p>
+            )}
+            {adminNav.map((item) => (
+              <NavItem
+                key={item.href}
+                item={item}
+                isActive={isActive(item.href)}
+                collapsed={collapsed}
+              />
+            ))}
+          </div>
+        )}
       </nav>
     </aside>
   )
@@ -94,6 +150,11 @@ export function Sidebar({ className }: SidebarProps) {
 
 export function MobileSidebar() {
   const pathname = usePathname()
+  const { isAdmin } = useBusiness()
+
+  function isActive(href: string) {
+    return href === "/" ? pathname === "/" : pathname.startsWith(href)
+  }
 
   return (
     <Sheet>
@@ -109,27 +170,30 @@ export function MobileSidebar() {
             <span>Dashboard</span>
           </Link>
         </div>
-        <nav className="flex-1 space-y-1 p-2">
-          {sidebarNav.map((item) => {
-            const Icon = item.icon
-            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+        <nav className="p-2 space-y-0.5">
+          {mainNav.map((item) => (
+            <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
+          ))}
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                <span>{item.title}</span>
-              </Link>
-            )
-          })}
+          <div className="border-t mt-3 pt-3">
+            <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+              Cuenta
+            </p>
+            {settingsNav.map((item) => (
+              <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
+            ))}
+          </div>
+
+          {isAdmin && (
+            <div className="border-t mt-3 pt-3">
+              <p className="px-3 pb-1 text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                Admin
+              </p>
+              {adminNav.map((item) => (
+                <NavItem key={item.href} item={item} isActive={isActive(item.href)} />
+              ))}
+            </div>
+          )}
         </nav>
       </SheetContent>
     </Sheet>
