@@ -1,9 +1,10 @@
 # Sprint 3 — Plan de Implementación: Sección "Automatizaciones" + N8N Analytics
 
-> **Estado**: En progreso  
+> **Estado**: En progreso — Fases 1, 2, 3 completadas ✅ | Fases 4-7 pendientes  
 > **Fecha de creación**: 2026-04-11  
+> **Última actualización**: 2026-04-15  
 > **Dependencia**: Sprint 3 original (v0.7.0) completado ✅  
-> **Versión objetivo**: 0.8.0
+> **Versión objetivo**: 0.8.0 → 0.9.0
 
 ---
 
@@ -35,9 +36,45 @@ El dashboard tiene webhooks funcionando (Telegram, Dokploy, N8N) pero los evento
 
 ---
 
+## Estado de Implementación
+
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| 1 | Schema de Base de Datos (migración 008) | ✅ Completada — ejecutada en prod |
+| 2 | Pipeline N8N — normalización + enrichment | ✅ Completada — verificada en prod (v0.8.2) |
+| 3 | TypeScript Types + Queries | ✅ Completada — commit `b10d1fd` |
+| 4 | Navegación + Layout Compartido | ⏳ Pendiente |
+| 5 | Level 1: Vista General de Instancias | ⏳ Pendiente |
+| 6 | Level 2: Detalle de Instancia | ⏳ Pendiente |
+| 7 | Level 3: Detalle de Workflow | ⏳ Pendiente |
+| 8 | Items Pendientes (filtros, paginación, etc.) | ⏳ Pendiente |
+
+### Punto de Arranque para el Agente
+
+**Lo que ya existe y NO hay que tocar:**
+- `supabase/migrations/008_automatizaciones_schema.sql` — ejecutada, NO re-ejecutar
+- `supabase/migrations/009_activity_feed_replica_identity.sql` — ejecutada, NO re-ejecutar
+- `src/app/api/webhooks/[source]/route.ts` — pipeline N8N completo, no modificar
+- `src/lib/n8n/enrichment.ts` — cliente API N8N con polling, no modificar
+- `src/lib/n8n/cost-calculator.ts` — calculadora de costos, no modificar
+- `src/lib/supabase/types.ts` — ya tiene `DbN8NInstance`, `DbN8NWorkflow`, `DbN8NExecution`, `DbModelPricing`, `DbCustomMetric`, `DbInstanceStats`, `DbWorkflowStats`, `DbExecutionTrend`, `AutomationGlobalMetrics`, `ExecutionFilters`
+- `src/lib/supabase/queries.ts` — ya tiene `fetchInstanceStats`, `fetchGlobalAutomationMetrics`, `fetchInstanceDetail`, `fetchWorkflowStats`, `fetchWorkflowDetail`, `fetchExecutions`, `fetchCustomMetrics`, `fetchExecutionTrend`
+
+**Estado actual de los archivos a modificar en Fase 4:**
+- `src/components/dashboard/sidebar.tsx` — `sidebarNav` tiene solo 1 item (Dashboard). `isActive` usa `pathname === item.href` (necesita fix para rutas anidadas). El icono `LayoutDashboard` ya está importado; hay que agregar `Zap` de lucide-react.
+- `src/app/page.tsx` — `"use client"`, tiene `Sidebar` + `Header` + `main` inline. Extraer a `DashboardLayout`.
+
+**Lo que hay que crear desde cero:**
+- `src/components/dashboard/dashboard-layout.tsx` — NO existe
+- `src/app/automatizaciones/` — directorio NO existe
+- `src/components/automatizaciones/` — directorio NO existe
+- `src/hooks/use-n8n-executions.ts` — NO existe
+
+---
+
 ## Fases de Implementación
 
-### Fase 1 — Schema de Base de Datos
+### Fase 1 — Schema de Base de Datos ✅ COMPLETADA
 
 **Migración**: `supabase/migrations/008_automatizaciones_schema.sql`
 
@@ -72,7 +109,7 @@ El dashboard tiene webhooks funcionando (Telegram, Dokploy, N8N) pero los evento
 
 ---
 
-### Fase 2 — Pipeline de Normalización + Enriquecimiento
+### Fase 2 — Pipeline de Normalización + Enriquecimiento ✅ COMPLETADA
 
 **Archivos a modificar**:
 - `src/app/api/webhooks/_lib/types.ts` — agregar `business_id` a `NormalizedEvent`
@@ -97,7 +134,7 @@ El dashboard tiene webhooks funcionando (Telegram, Dokploy, N8N) pero los evento
 
 ---
 
-### Fase 3 — TypeScript Types + Queries
+### Fase 3 — TypeScript Types + Queries ✅ COMPLETADA
 
 **Archivos a modificar**:
 - `src/lib/supabase/types.ts` — agregar: `DbN8NInstance`, `DbN8NWorkflow`, `DbN8NExecution`, `DbModelPricing`, `DbCustomMetric`, `DbInstanceStats`, `DbWorkflowStats`
@@ -118,19 +155,42 @@ El dashboard tiene webhooks funcionando (Telegram, Dokploy, N8N) pero los evento
 ### Fase 4 — Navegación + Layout Compartido
 
 **Archivos a modificar**:
-- `src/components/dashboard/sidebar.tsx` — agregar nav item "Automatizaciones" con icono `Zap`
-  - Cambiar `isActive` de `pathname === item.href` a `item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)`
+
+1. **`src/components/dashboard/sidebar.tsx`**:
+   - Agregar `Zap` al import de `lucide-react`
+   - Agregar a `sidebarNav`: `{ title: "Automatizaciones", href: "/automatizaciones", icon: Zap }`
+   - Cambiar `isActive` en ambos componentes (`Sidebar` y `MobileSidebar`) de:
+     ```ts
+     const isActive = pathname === item.href
+     ```
+     a:
+     ```ts
+     const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
+     ```
+
+2. **`src/app/page.tsx`**:
+   - Reemplazar el `<div className="flex min-h-screen">` con `<DashboardLayout>` importado desde `@/components/dashboard/dashboard-layout`
+   - Eliminar `<Sidebar />` y `<Header />` del JSX (los provee DashboardLayout)
+   - Conservar todo el estado y lógica business; solo cambia la estructura de layout
 
 **Archivos nuevos**:
-- `src/components/dashboard/dashboard-layout.tsx` — wrapper reutilizable (Sidebar + Header + main)
-- Refactor `src/app/page.tsx` para usar `DashboardLayout`
 
-**Rutas**:
+3. **`src/components/dashboard/dashboard-layout.tsx`** (nuevo):
+   ```tsx
+   // Server component — solo estructura visual, sin estado
+   // Renderiza: <Sidebar /> a la izquierda + <Header /> arriba + {children} en main
+   // El "use client" NO va aquí — Sidebar y Header ya lo tienen internamente
+   // children va dentro de: <main className="flex-1 p-4 md:p-6 lg:p-8">
+   ```
+
+**Rutas a crear (estructuras vacías en Fases 5-7)**:
 ```
-/automatizaciones                              → Level 1
-/automatizaciones/[instanceId]                 → Level 2
-/automatizaciones/[instanceId]/[workflowId]    → Level 3
+src/app/automatizaciones/page.tsx                          → Level 1
+src/app/automatizaciones/[instanceId]/page.tsx             → Level 2
+src/app/automatizaciones/[instanceId]/[workflowId]/page.tsx → Level 3
 ```
+
+**Verificación Fase 4**: navegar a `/automatizaciones` desde el sidebar → enlace resalta correctamente; volver a `/` → Dashboard resalta, Automatizaciones no.
 
 ---
 
