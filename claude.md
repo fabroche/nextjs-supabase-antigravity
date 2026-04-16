@@ -11,9 +11,9 @@
 ## Project Overview
 
 **Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Version**: v0.9.0 — Sección Automatizaciones completa (3 niveles de drill-down)  
-**Next**: Sprint 3 Fase 8 — filtros activity feed, paginación, settings panel, dead letters  
-**Sprint activo**: `SPRINT-3-PLAN.md` (Fase 8 pendiente)
+**Version**: v1.0.0 — Sprint 3 completo. Automatizaciones + Settings + Dead Letters + Activity feed filters  
+**Next**: Sprint 4 por definir. Pendiente menor: normalizer Notion (webhook llega pero se ignora)  
+**Sprint activo**: ninguno — `SPRINT-3-PLAN.md` cerrado ✅
 
 ---
 
@@ -45,30 +45,44 @@ src/
         types.ts             # NormalizedEvent (source, event_type, actor, action, description, business_id?)
         validators.ts        # HMAC para Dokploy/Notion; comparación directa para Telegram/N8N
         normalizers.ts       # normalizeN8N(), normalizeTelegram() — construyen NormalizedEvent
+                             # ⚠️ Notion: case comentado, normalizer pendiente
+    settings/
+      page.tsx               # Form para vincular telegram_id + notion_person_id al perfil
+    admin/
+      dead-letters/
+        page.tsx             # Tabla dead letters + "Resolver" — solo admin (useBusiness().isAdmin)
   lib/
     n8n/
       enrichment.ts          # fetchN8NExecutionDetail() — polling hasta finished=true
       cost-calculator.ts     # calculateCost() — cache in-memory 5min desde model_pricing
     supabase/
-      types.ts               # DbBusiness, DbActivityFeed, DbN8NInstance..DbExecutionTrend, ExecutionFilters
-      queries.ts             # fetchBusinessMetrics, fetchInstanceStats, fetchExecutions, fetchExecutionTrend...
+      types.ts               # DbBusiness, DbActivityFeed, DbDeadLetter, DbUserProfile,
+                             # DbN8NInstance..DbExecutionTrend, DbWorkflowMetricsByRange, ExecutionFilters
+      queries.ts             # fetchActivityFeed(limit,offset,source?), fetchUserProfile,
+                             # updateUserProfile, fetchDeadLetters, resolveDeadLetter,
+                             # fetchInstanceStats, fetchExecutions, fetchExecutionTrend,
+                             # fetchWorkflowMetricsByRange
   hooks/
-    use-activity-feed.ts     # Realtime INSERT+UPDATE → merge in-place por id
+    use-activity-feed.ts     # source filter + offset pagination + loadMore() + Realtime INSERT+UPDATE
     use-notifications.ts     # Realtime INSERT filtrado por user_id
+    use-n8n-executions.ts    # Realtime INSERT en n8n_executions → signal para refresh silencioso
   components/
     dashboard/
-      activity-feed.tsx      # Skeleton "Calculando costo…" mientras enrichment_pending=true
-      sidebar.tsx            # Collapsible 256px/64px; sidebarNav array; isActive startsWith
+      activity-feed.tsx      # Source Select filter + "Cargar más" + skeleton loading state
+                             # Skeleton "Calculando costo…" mientras enrichment_pending=true
+      sidebar.tsx            # Collapsible; NavItem shared component; useBusiness() para isAdmin
+                             # Secciones: Main | Cuenta (Ajustes) | Admin (Dead Letters, solo admin)
       dashboard-layout.tsx   # Layout compartido (Sidebar + Header + main) — usar en todas las páginas
     automatizaciones/
       global-metrics.tsx     # 4 MetricCards globales (ejecuciones, error rate, costo, tokens)
       instance-card.tsx      # Card clickeable → Level 2, status dot, stats
       instance-metrics.tsx   # 4 MetricCards por instancia (DbInstanceStats)
       workflow-card.tsx      # Card clickeable → Level 3, tags, stats
-      workflow-metrics.tsx   # 4 MetricCards por workflow (DbWorkflowStats)
-      execution-trend-chart.tsx # Recharts AreaChart (success vs error por día, 30d)
+      workflow-metrics.tsx   # 4 MetricCards por workflow; acepta rangeMetrics + dateRange para filtro
+      execution-trend-chart.tsx # Recharts AreaChart; description prop dinámica según rango activo
       execution-filters.tsx  # DateRangePicker + Select status → ExecutionFilters
-      execution-table.tsx    # Tabla paginada 20/página con skeleton loading
+      execution-table.tsx    # Tabla paginada 20/página con skeleton loading + columna error
+      export-button.tsx      # DropdownMenu "Exportar" → CSV (extensible a otros formatos)
   app/
     automatizaciones/
       page.tsx               # Level 1 — GlobalMetrics + grid de InstanceCards
@@ -76,8 +90,7 @@ src/
         page.tsx             # Level 2 — breadcrumb + InstanceMetrics + TrendChart + WorkflowCards
         [workflowId]/
           page.tsx           # Level 3 — breadcrumb + WorkflowMetrics + TrendChart + filters + table
-  hooks/
-    use-n8n-executions.ts    # Realtime INSERT en n8n_executions → signal para refresh silencioso
+                             # Date range sincroniza métricas, gráfica y tabla simultáneamente
 ```
 
 ---
@@ -104,7 +117,7 @@ src/
 
 ## Database Schema
 
-**Migrations ejecutadas**: 001–009 en producción. NUNCA re-ejecutar.
+**Migrations ejecutadas**: 001–010 en producción. NUNCA re-ejecutar.
 
 | Tabla | Propósito |
 |-------|-----------|
@@ -115,7 +128,7 @@ src/
 | `activity_feed` | Todos los eventos webhook. `business_id` nullable. `severity`, `metadata` JSONB |
 | `notifications` | Notificaciones personales por user |
 | `webhook_sources` | Config + secrets por source |
-| `webhook_dead_letters` | Failed webhooks queue |
+| `webhook_dead_letters` | Failed webhooks queue. `resolved BOOLEAN DEFAULT false`. Admin UI en `/admin/dead-letters` |
 | `n8n_instances` | Instancias N8N por negocio. `instance_id` TEXT UNIQUE, `api_base_url`, `api_key` |
 | `n8n_workflows` | Auto-creados al primer webhook. UNIQUE(instance_id, workflow_id) |
 | `n8n_executions` | Core analytics. UNIQUE(instance_id, execution_id). `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `is_enriched` |
@@ -123,7 +136,8 @@ src/
 | `custom_metrics` | KPIs configurables por workflow/instancia |
 
 **Vistas**: `business_metrics`, `n8n_instance_stats`, `n8n_workflow_stats`  
-**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?)`
+**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`  
+**Context hook**: `useBusiness()` (NO `useBusinessContext`) — exportado desde `contexts/business-context.tsx`
 
 **RLS pattern**: admin via `is_admin()` (SECURITY DEFINER). Negocio via cadena `owner_id = auth.uid()` o join a `businesses`.  
 **⚠️ REPLICA IDENTITY FULL**: requerido en tablas RLS para que Realtime emita UPDATE events. Aplicado en migración 009 a `activity_feed` + `notifications`. Sin esto, los UPDATEs se descartan silenciosamente.
@@ -195,11 +209,15 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
 
 ## Estado Actual
 
-- ✅ Migrations 001–009 ejecutadas en producción
+- ✅ Migrations 001–010 ejecutadas en producción
 - ✅ Realtime WebSocket funcionando (2026-04-09)
 - ✅ N8N pipeline verificado con `gpt-4.1-mini` (2026-04-15)
-- ✅ Sprint 3 Fases 1-7 completadas: schema + pipeline + types/queries + UI completa
-- ⏳ Sprint 3 Fase 8: filtros activity feed, paginación, settings panel, dead letters
+- ✅ Sprint 3 completo (2026-04-17) — v1.0.0
+  - Fases 1-7: schema + pipeline + Automatizaciones UI 3 niveles
+  - Migration 010: date range en trend + `get_workflow_metrics_by_range`
+  - Fase 8: activity feed filters/pagination, settings panel, dead letters admin, Telegram video chat fix
+- ⏳ Pendiente menor: normalizer Notion (webhooks llegan pero se ignoran)
+- ⏳ Sprint 4: por definir
 
 ---
 
@@ -213,4 +231,4 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
 
 ---
 
-_Last Updated: 2026-04-16 | Version: 0.9.0_
+_Last Updated: 2026-04-17 | Version: 1.0.0_
