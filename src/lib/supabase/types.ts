@@ -210,6 +210,17 @@ export interface DbExecutionTrend {
   total_cost: number
 }
 
+// RPC: get_workflow_metrics_by_range result row
+export interface DbWorkflowMetricsByRange {
+  total_executions: number
+  success_count: number
+  error_count: number
+  error_rate: number
+  total_tokens: number
+  total_cost: number
+  avg_duration_ms: number | null
+}
+
 // Aggregated global metrics built from n8n_instance_stats
 export interface AutomationGlobalMetrics {
   total_executions: number

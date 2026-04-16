@@ -50,6 +50,7 @@ export async function fetchN8NExecutionDetail(
       }
 
       const { tokens_prompt, tokens_completion, model_name } = extractTokenUsage(data)
+      console.log(`[n8n-enrichment] exec=${executionId} extracted: tokens_prompt=${tokens_prompt} tokens_completion=${tokens_completion} model=${model_name}`)
       return {
         tokens_prompt,
         tokens_completion,
@@ -90,7 +91,11 @@ function extractTokenUsage(data: Record<string, unknown>): {
     const runData = resultData?.resultData as Record<string, unknown> | undefined
     const nodeResults = runData?.runData as Record<string, unknown[]> | undefined
 
-    if (!nodeResults) return { tokens_prompt: 0, tokens_completion: 0, model_name: null }
+    if (!nodeResults) {
+      console.log(`[n8n-enrichment] runData vacío o estructura inesperada. Keys en data: ${Object.keys(data).join(', ')}`)
+      return { tokens_prompt: 0, tokens_completion: 0, model_name: null }
+    }
+    console.log(`[n8n-enrichment] nodeResults keys: ${Object.keys(nodeResults).join(', ')}`)
 
     for (const nodeRuns of Object.values(nodeResults)) {
       if (!Array.isArray(nodeRuns)) continue

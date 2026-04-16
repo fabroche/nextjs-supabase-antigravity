@@ -288,17 +288,40 @@ export async function fetchCustomMetrics(scope: {
 }
 
 // Execution trend data for charts (RPC: get_execution_trend)
+// When from/to are provided the series covers that exact range;
+// otherwise falls back to the last `days` days.
 export async function fetchExecutionTrend(
   instanceId?: string,
   workflowId?: string,
-  days = 30
+  days = 30,
+  from?: Date,
+  to?: Date,
 ): Promise<DbExecutionTrend[]> {
   const supabase = createClient()
   const { data, error } = await supabase.rpc('get_execution_trend', {
     p_instance_id: instanceId ?? null,
     p_workflow_id: workflowId ?? null,
     p_days: days,
+    p_from: from?.toISOString() ?? null,
+    p_to: to?.toISOString() ?? null,
   })
   if (error) throw error
   return data || []
+}
+
+// Aggregated KPIs for a workflow within an optional date range
+// (RPC: get_workflow_metrics_by_range)
+export async function fetchWorkflowMetricsByRange(
+  workflowId: string,
+  from?: Date,
+  to?: Date,
+): Promise<import('./types').DbWorkflowMetricsByRange | null> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc('get_workflow_metrics_by_range', {
+    p_workflow_id: workflowId,
+    p_from: from?.toISOString() ?? null,
+    p_to: to?.toISOString() ?? null,
+  })
+  if (error) throw error
+  return (data as import('./types').DbWorkflowMetricsByRange[] | null)?.[0] ?? null
 }

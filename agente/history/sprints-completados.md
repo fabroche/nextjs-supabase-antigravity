@@ -45,5 +45,30 @@
 - 10 interfaces en `types.ts`: DbN8NInstance, DbN8NWorkflow, DbN8NExecution, DbModelPricing, DbCustomMetric, DbInstanceStats, DbWorkflowStats, DbExecutionTrend, AutomationGlobalMetrics, ExecutionFilters
 - 8 query functions en `queries.ts`: fetchInstanceStats, fetchGlobalAutomationMetrics, fetchInstanceDetail, fetchWorkflowStats, fetchWorkflowDetail, fetchExecutions (paginada), fetchCustomMetrics, fetchExecutionTrend
 
-### Fases 4-7 — UI Automatizaciones (Pendientes)
+### Fases 4-7 — UI Automatizaciones (Completadas, 2026-04-16)
+
+**Fase 4 — Navegación + Layout:**
+- `sidebar.tsx`: item "Automatizaciones" (Zap icon), `isActive` con `startsWith`
+- `dashboard-layout.tsx`: layout compartido (Sidebar + Header + main)
+- `page.tsx`: refactorizado a usar `DashboardLayout`
+
+**Fase 5 — Level 1 `/automatizaciones`:**
+- 4 GlobalMetrics cards (ejecuciones, error rate, costo, tokens)
+- Grid de InstanceCards con status dot (verde/amarillo/rojo/gris), stats, link a Level 2
+- `useN8NExecutions` hook — Realtime INSERT en `n8n_executions` → refresh silencioso
+
+**Fase 6 — Level 2 `/automatizaciones/[instanceId]`:**
+- Breadcrumb: Automatizaciones > nombre instancia
+- 4 InstanceMetrics cards por instancia
+- ExecutionTrendChart (Recharts AreaChart, success vs error por día)
+- Grid de WorkflowCards con stats, link a Level 3
+
+**Fase 7 — Level 3 `/automatizaciones/[instanceId]/[workflowId]`:**
+- Breadcrumb: Automatizaciones > instancia > workflow
+- 4 WorkflowMetrics cards (ejecuciones, error rate, costo, duración promedio)
+- ExecutionTrendChart por workflow
+- ExecutionFiltersBar (DateRangePicker + Select status)
+- ExecutionTable paginada (20 por página): fecha, estado, evento, modelo, tokens, costo, duración
+
+### Fase 8 — Items Pendientes (Pendiente)
 Ver `SPRINT-3-PLAN.md` para detalle completo.

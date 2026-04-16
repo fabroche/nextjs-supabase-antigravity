@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ChevronLeft,
   Menu,
+  Zap,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -18,6 +19,11 @@ const sidebarNav = [
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Automatizaciones",
+    href: "/automatizaciones",
+    icon: Zap,
   },
 ]
 
@@ -62,7 +68,7 @@ export function Sidebar({ className }: SidebarProps) {
       <nav className="flex-1 space-y-1 p-2">
         {sidebarNav.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href
+          const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
 
           return (
             <Link
@@ -106,7 +112,7 @@ export function MobileSidebar() {
         <nav className="flex-1 space-y-1 p-2">
           {sidebarNav.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
 
             return (
               <Link

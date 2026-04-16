@@ -11,9 +11,9 @@
 ## Project Overview
 
 **Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Version**: v0.8.2 — N8N pipeline verificado en prod, Sprint 3 Fase 3 completada  
-**Next**: Sprint 3 Fases 4-7 — sidebar nav + 3 niveles de UI `/automatizaciones`  
-**Sprint activo**: `SPRINT-3-PLAN.md` (Fases 4-7 pendientes, leer antes de implementar)
+**Version**: v0.9.0 — Sección Automatizaciones completa (3 niveles de drill-down)  
+**Next**: Sprint 3 Fase 8 — filtros activity feed, paginación, settings panel, dead letters  
+**Sprint activo**: `SPRINT-3-PLAN.md` (Fase 8 pendiente)
 
 ---
 
@@ -58,7 +58,26 @@ src/
   components/
     dashboard/
       activity-feed.tsx      # Skeleton "Calculando costo…" mientras enrichment_pending=true
-      sidebar.tsx            # Collapsible 256px/64px; sidebarNav array; isActive por pathname
+      sidebar.tsx            # Collapsible 256px/64px; sidebarNav array; isActive startsWith
+      dashboard-layout.tsx   # Layout compartido (Sidebar + Header + main) — usar en todas las páginas
+    automatizaciones/
+      global-metrics.tsx     # 4 MetricCards globales (ejecuciones, error rate, costo, tokens)
+      instance-card.tsx      # Card clickeable → Level 2, status dot, stats
+      instance-metrics.tsx   # 4 MetricCards por instancia (DbInstanceStats)
+      workflow-card.tsx      # Card clickeable → Level 3, tags, stats
+      workflow-metrics.tsx   # 4 MetricCards por workflow (DbWorkflowStats)
+      execution-trend-chart.tsx # Recharts AreaChart (success vs error por día, 30d)
+      execution-filters.tsx  # DateRangePicker + Select status → ExecutionFilters
+      execution-table.tsx    # Tabla paginada 20/página con skeleton loading
+  app/
+    automatizaciones/
+      page.tsx               # Level 1 — GlobalMetrics + grid de InstanceCards
+      [instanceId]/
+        page.tsx             # Level 2 — breadcrumb + InstanceMetrics + TrendChart + WorkflowCards
+        [workflowId]/
+          page.tsx           # Level 3 — breadcrumb + WorkflowMetrics + TrendChart + filters + table
+  hooks/
+    use-n8n-executions.ts    # Realtime INSERT en n8n_executions → signal para refresh silencioso
 ```
 
 ---
@@ -179,8 +198,8 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
 - ✅ Migrations 001–009 ejecutadas en producción
 - ✅ Realtime WebSocket funcionando (2026-04-09)
 - ✅ N8N pipeline verificado con `gpt-4.1-mini` (2026-04-15)
-- ✅ Sprint 3 Fases 1-3 completadas: schema + pipeline + types/queries
-- ⏳ Sprint 3 Fases 4-7: sidebar nav + UI `/automatizaciones` (ver `SPRINT-3-PLAN.md`)
+- ✅ Sprint 3 Fases 1-7 completadas: schema + pipeline + types/queries + UI completa
+- ⏳ Sprint 3 Fase 8: filtros activity feed, paginación, settings panel, dead letters
 
 ---
 
@@ -194,4 +213,4 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
 
 ---
 
-_Last Updated: 2026-04-15 | Version: 0.8.2_
+_Last Updated: 2026-04-16 | Version: 0.9.0_

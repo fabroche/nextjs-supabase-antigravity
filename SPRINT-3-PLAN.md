@@ -1,8 +1,8 @@
 # Sprint 3 — Plan de Implementación: Sección "Automatizaciones" + N8N Analytics
 
-> **Estado**: En progreso — Fases 1, 2, 3 completadas ✅ | Fases 4-7 pendientes  
+> **Estado**: En progreso — Fases 1-7 completadas ✅ | Fase 8 pendiente  
 > **Fecha de creación**: 2026-04-11  
-> **Última actualización**: 2026-04-15  
+> **Última actualización**: 2026-04-16  
 > **Dependencia**: Sprint 3 original (v0.7.0) completado ✅  
 > **Versión objetivo**: 0.8.0 → 0.9.0
 
@@ -43,10 +43,10 @@ El dashboard tiene webhooks funcionando (Telegram, Dokploy, N8N) pero los evento
 | 1 | Schema de Base de Datos (migración 008) | ✅ Completada — ejecutada en prod |
 | 2 | Pipeline N8N — normalización + enrichment | ✅ Completada — verificada en prod (v0.8.2) |
 | 3 | TypeScript Types + Queries | ✅ Completada — commit `b10d1fd` |
-| 4 | Navegación + Layout Compartido | ⏳ Pendiente |
-| 5 | Level 1: Vista General de Instancias | ⏳ Pendiente |
-| 6 | Level 2: Detalle de Instancia | ⏳ Pendiente |
-| 7 | Level 3: Detalle de Workflow | ⏳ Pendiente |
+| 4 | Navegación + Layout Compartido | ✅ Completada |
+| 5 | Level 1: Vista General de Instancias | ✅ Completada |
+| 6 | Level 2: Detalle de Instancia | ✅ Completada |
+| 7 | Level 3: Detalle de Workflow | ✅ Completada |
 | 8 | Items Pendientes (filtros, paginación, etc.) | ⏳ Pendiente |
 
 ### Punto de Arranque para el Agente
