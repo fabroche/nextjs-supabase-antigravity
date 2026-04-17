@@ -21,6 +21,8 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 7 | `007_activity_severity.sql` | Adds `severity` column to `activity_feed` for color-coded UI (success/warning/error/null) |
 | 8 | `008_automatizaciones_schema.sql` | N8N analytics: `n8n_instances`, `n8n_workflows`, `n8n_executions`, `model_pricing`, `custom_metrics`, views, RPC, seed pricing. Adds `business_id` to `activity_feed` |
 | 9 | `009_activity_feed_replica_identity.sql` | `REPLICA IDENTITY FULL` on `activity_feed` + `notifications` so Supabase Realtime broadcasts UPDATE events under RLS |
+| 10 | `010_date_range_filtering.sql` | `get_execution_trend` RPC extended with `p_from`/`p_to` params; new `get_workflow_metrics_by_range` RPC for date-scoped workflow KPIs |
+| 11 | `011_n8n_archived.sql` | Adds `archived_at TIMESTAMPTZ` to `n8n_instances` for soft-delete. RLS admin policy already in migration 008 — no new policy. Rollback: `011_n8n_archived_rollback.sql` |
 
 ---
 
@@ -167,7 +169,9 @@ The admin user is configured as `genzai.cloud@gmail.com` in both:
 | 2026-04-09 | 007_activity_severity.sql | Executed | severity column on activity_feed for color-coded events |
 | 2026-04-12 | 008_automatizaciones_schema.sql | Executed | N8N analytics schema (5 tables + 2 views + 1 RPC + model pricing seed), activity_feed.business_id |
 | 2026-04-13 | 009_activity_feed_replica_identity.sql | Executed | REPLICA IDENTITY FULL on activity_feed + notifications. Required for Realtime to broadcast UPDATE events on RLS-enabled tables. Fixes enrichment UPDATEs not reaching the dashboard |
+| 2026-04-15 | 010_date_range_filtering.sql | Executed | get_execution_trend date range params + get_workflow_metrics_by_range RPC |
+| 2026-04-17 | 011_n8n_archived.sql | **Pending** | Sprint 3-MAX PR1 — soft-delete for n8n_instances. Run in Supabase Studio SQL Editor. |
 
 ---
 
-_Last Updated: 2026-04-13_
+_Last Updated: 2026-04-17_

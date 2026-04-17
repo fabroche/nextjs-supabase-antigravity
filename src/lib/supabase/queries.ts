@@ -223,9 +223,13 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
 export const EXECUTIONS_PAGE_SIZE = 20
 
 // Level 1 — all instances with aggregated stats (view: n8n_instance_stats)
+// Only non-archived instances are shown
 export async function fetchInstanceStats(businessId?: string): Promise<DbInstanceStats[]> {
   const supabase = createClient()
-  let query = supabase.from('n8n_instance_stats').select('*').order('name')
+  let query = supabase
+    .from('n8n_instance_stats')
+    .select('*')
+    .order('name')
   if (businessId) query = query.eq('business_id', businessId)
   const { data, error } = await query
   if (error) throw error
@@ -363,6 +367,82 @@ export async function fetchExecutionTrend(
     p_from: from?.toISOString() ?? null,
     p_to: to?.toISOString() ?? null,
   })
+  if (error) throw error
+  return data || []
+}
+
+// ============================================================
+// N8N Instances CRUD (admin only)
+// ============================================================
+
+export interface CreateN8NInstanceInput {
+  business_id: string
+  instance_id: string
+  name: string
+  environment: 'production' | 'staging' | 'development'
+  api_base_url?: string
+  api_key?: string
+}
+
+export interface UpdateN8NInstanceInput {
+  id: string
+  name?: string
+  environment?: 'production' | 'staging' | 'development'
+  api_base_url?: string
+  api_key?: string
+}
+
+export async function createN8NInstance(input: CreateN8NInstanceInput): Promise<DbN8NInstance> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('n8n_instances')
+    .insert({
+      business_id: input.business_id,
+      instance_id: input.instance_id,
+      name: input.name,
+      environment: input.environment,
+      api_base_url: input.api_base_url || null,
+      api_key: input.api_key || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateN8NInstance(input: UpdateN8NInstanceInput): Promise<void> {
+  const supabase = createClient()
+  const updates: Record<string, unknown> = {}
+  if (input.name !== undefined) updates.name = input.name
+  if (input.environment !== undefined) updates.environment = input.environment
+  if (input.api_base_url !== undefined) updates.api_base_url = input.api_base_url || null
+  if (input.api_key !== undefined && input.api_key !== '') updates.api_key = input.api_key
+  const { error } = await supabase
+    .from('n8n_instances')
+    .update(updates)
+    .eq('id', input.id)
+  if (error) throw error
+}
+
+export async function archiveN8NInstance(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('n8n_instances')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// Fetch all non-archived instances for CRUD management (returns full row incl. api_key mask)
+export async function fetchN8NInstances(businessId?: string): Promise<DbN8NInstance[]> {
+  const supabase = createClient()
+  let query = supabase
+    .from('n8n_instances')
+    .select('*')
+    .is('archived_at', null)
+    .order('name')
+  if (businessId) query = query.eq('business_id', businessId)
+  const { data, error } = await query
   if (error) throw error
   return data || []
 }

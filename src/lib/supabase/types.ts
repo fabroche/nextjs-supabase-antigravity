@@ -120,6 +120,7 @@ export interface DbN8NInstance {
   api_base_url: string | null
   api_key: string | null
   is_active: boolean
+  archived_at: string | null
   created_at: string
   updated_at: string
 }
