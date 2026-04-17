@@ -31,10 +31,10 @@ import {
 } from "@/components/ui/select"
 import { testN8NConnection } from "@/lib/n8n/test-connection"
 import {
-  actionUpdateInstance,
   updateInstanceSchema,
   type UpdateInstanceInput,
-} from "@/app/actions/n8n-instances"
+} from "@/app/actions/n8n-instances.schemas"
+import { actionUpdateInstance } from "@/app/actions/n8n-instances"
 import type { DbN8NInstance } from "@/lib/supabase/types"
 
 interface EditInstanceDialogProps {

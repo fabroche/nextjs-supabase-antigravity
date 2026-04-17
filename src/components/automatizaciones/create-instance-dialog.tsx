@@ -33,10 +33,10 @@ import {
 import { useBusiness } from "@/contexts/business-context"
 import { testN8NConnection } from "@/lib/n8n/test-connection"
 import {
-  actionCreateInstance,
   createInstanceSchema,
   type CreateInstanceInput,
-} from "@/app/actions/n8n-instances"
+} from "@/app/actions/n8n-instances.schemas"
+import { actionCreateInstance } from "@/app/actions/n8n-instances"
 
 interface CreateInstanceDialogProps {
   onCreated: () => void
