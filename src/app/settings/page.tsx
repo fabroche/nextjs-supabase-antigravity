@@ -106,7 +106,8 @@ export default function SettingsPage() {
 
     try {
       const supabase = createClient()
-      const ext = pendingFile.name.split(".").pop() ?? "jpg"
+      const rawExt = (pendingFile.name.split(".").pop() ?? "jpg").toLowerCase()
+      const ext = rawExt === "jpeg" ? "jpg" : rawExt
       const path = `${profile.id}/avatar.${ext}`
 
       const { error: uploadError } = await supabase.storage
