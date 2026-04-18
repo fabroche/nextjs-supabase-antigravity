@@ -16,7 +16,7 @@ AS $$
   SELECT COUNT(*)
   FROM public.n8n_executions e
   WHERE e.workflow_id = p_workflow_id
-    AND e.event_type  = p_event_type
+    AND LOWER(e.event_type) = LOWER(p_event_type)
     AND (p_from IS NULL OR e.started_at >= p_from)
     AND (p_to   IS NULL OR e.started_at <= p_to);
 $$;
