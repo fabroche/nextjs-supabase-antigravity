@@ -48,16 +48,13 @@ export default function AutomatizacionesPage() {
   const load = useCallback(async (cancelled?: { current: boolean }) => {
     setIsLoading(true)
     try {
-      const promises: [
-        Promise<DbInstanceStats[]>,
-        Promise<AutomationGlobalMetrics>,
-        Promise<DbN8NInstance[]>,
-      ] = [
+      const [stats, metrics, full] = await Promise.all([
         fetchInstanceStats(selectedBusiness?.id),
         fetchGlobalAutomationMetrics(selectedBusiness?.id),
-        isAdmin ? fetchN8NInstances(selectedBusiness?.id) : Promise.resolve([]),
-      ]
-      const [stats, metrics, full] = await Promise.all(promises)
+        isAdmin
+          ? fetchN8NInstances(selectedBusiness?.id).catch(() => [] as DbN8NInstance[])
+          : Promise.resolve([] as DbN8NInstance[]),
+      ])
       if (cancelled?.current) return
       setInstances(stats)
       setGlobalMetrics(metrics)

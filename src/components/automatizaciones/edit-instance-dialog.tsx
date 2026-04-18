@@ -96,12 +96,17 @@ export function EditInstanceDialog({
     if (!apiBaseUrl || !apiKey) return
     setTestState("testing")
     setTestError(null)
-    const result = await testN8NConnection(apiBaseUrl, apiKey)
-    if (result.ok) {
-      setTestState("ok")
-    } else {
+    try {
+      const result = await testN8NConnection(apiBaseUrl, apiKey)
+      if (result.ok) {
+        setTestState("ok")
+      } else {
+        setTestState("fail")
+        setTestError(result.error ?? "Conexión fallida")
+      }
+    } catch {
       setTestState("fail")
-      setTestError(result.error ?? "Conexión fallida")
+      setTestError("Error al probar la conexión")
     }
   }
 
