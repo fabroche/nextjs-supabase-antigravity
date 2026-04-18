@@ -87,6 +87,7 @@ export interface DbUserProfile {
   role: 'admin' | 'negocio'
   telegram_id: string | null
   notion_person_id: string | null
+  ui_preferences: UiPreferences
   updated_at: string
 }
 
@@ -260,6 +261,35 @@ export interface ExecutionFilters {
   event_type?: string
   from?: Date
   to?: Date
+}
+
+// ============================================================
+// Metric registry (migration 012)
+// ============================================================
+
+export type MetricScope = 'global' | 'instance' | 'workflow'
+export type MetricFormat = 'number' | 'currency' | 'percent' | 'tokens'
+
+export interface DbMetricDefinition {
+  id: string
+  key: string
+  scope: MetricScope
+  label: string
+  description: string | null
+  format: MetricFormat
+  icon: string | null
+  display_order: number
+  is_active: boolean
+  business_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface UiPreferences {
+  hidden_metrics?: {
+    global?: string[]
+    [key: string]: string[] | undefined
+  }
 }
 
 // ============================================================

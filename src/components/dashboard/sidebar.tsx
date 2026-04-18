@@ -10,6 +10,7 @@ import {
   Zap,
   Settings,
   ShieldAlert,
+  BarChart2,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -28,6 +29,7 @@ const settingsNav = [
 
 const adminNav = [
   { title: "Dead Letters", href: "/admin/dead-letters", icon: ShieldAlert },
+  { title: "Métricas", href: "/admin/metrics", icon: BarChart2 },
 ]
 
 function NavItem({

@@ -18,6 +18,9 @@ import type {
   DbExecutionTrend,
   AutomationGlobalMetrics,
   ExecutionFilters,
+  DbMetricDefinition,
+  MetricScope,
+  UiPreferences,
 } from './types'
 
 // Get the authenticated user's role ('admin' | 'negocio')
@@ -139,11 +142,36 @@ export async function fetchUserProfile(): Promise<DbUserProfile | null> {
   if (!user) return null
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, full_name, role, telegram_id, notion_person_id, updated_at')
+    .select('id, full_name, role, telegram_id, notion_person_id, ui_preferences, updated_at')
     .eq('id', user.id)
     .single()
   if (error) throw error
   return data
+}
+
+// UI preferences only (for metric visibility hook)
+export async function fetchUiPreferences(): Promise<UiPreferences> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return {}
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('ui_preferences')
+    .eq('id', user.id)
+    .single()
+  if (error) return {}
+  return (data?.ui_preferences as UiPreferences) ?? {}
+}
+
+export async function updateUiPreferences(prefs: UiPreferences): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ ui_preferences: prefs })
+    .eq('id', user.id)
+  if (error) throw error
 }
 
 // Update current user's profile fields
@@ -443,6 +471,87 @@ export async function fetchN8NInstances(businessId?: string): Promise<DbN8NInsta
     .order('name')
   if (businessId) query = query.eq('business_id', businessId)
   const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+// ============================================================
+// Metric definitions registry (migration 012)
+// ============================================================
+
+// Returns metric definitions for a scope, resolving business overrides.
+// Row with matching business_id wins over row with business_id IS NULL (preset).
+export async function fetchMetricDefinitions(
+  scope: MetricScope,
+  businessId?: string,
+): Promise<DbMetricDefinition[]> {
+  const supabase = createClient()
+  // Fetch both presets (business_id IS NULL) and business overrides in one query
+  let query = supabase
+    .from('metric_definitions')
+    .select('*')
+    .eq('scope', scope)
+    .eq('is_active', true)
+    .or(businessId ? `business_id.is.null,business_id.eq.${businessId}` : 'business_id.is.null')
+    .order('display_order', { ascending: true })
+  const { data, error } = await query
+  if (error) throw error
+  const rows = data || []
+  // DISTINCT ON (key): business-specific row wins over global preset
+  const seen = new Map<string, DbMetricDefinition>()
+  for (const row of rows) {
+    const existing = seen.get(row.key)
+    if (!existing || (row.business_id !== null && existing.business_id === null)) {
+      seen.set(row.key, row)
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => a.display_order - b.display_order)
+}
+
+// Fetch ALL metric definitions for admin management (including inactive)
+export async function fetchAllMetricDefinitions(scope?: MetricScope): Promise<DbMetricDefinition[]> {
+  const supabase = createClient()
+  let query = supabase
+    .from('metric_definitions')
+    .select('*')
+    .is('business_id', null)
+    .order('scope')
+    .order('display_order')
+  if (scope) query = query.eq('scope', scope)
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function updateMetricDefinition(
+  id: string,
+  updates: Partial<Pick<DbMetricDefinition, 'label' | 'is_active' | 'display_order'>>
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('metric_definitions')
+    .update(updates)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function reorderMetricDefinitions(
+  items: { id: string; display_order: number }[]
+): Promise<void> {
+  const supabase = createClient()
+  await Promise.all(
+    items.map(({ id, display_order }) =>
+      supabase.from('metric_definitions').update({ display_order }).eq('id', id)
+    )
+  )
+}
+
+export async function fetchCustomMetricsList(): Promise<import('./types').DbCustomMetric[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('custom_metrics')
+    .select('*')
+    .order('name')
   if (error) throw error
   return data || []
 }
