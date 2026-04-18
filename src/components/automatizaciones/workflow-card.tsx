@@ -32,7 +32,7 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
                   getStatusDot(workflow)
                 )}
               />
-              <CardTitle className="text-sm truncate">{workflow.name}</CardTitle>
+              <CardTitle className="text-sm line-clamp-2 leading-snug">{workflow.name}</CardTitle>
             </div>
           </div>
           {workflow.tags && workflow.tags.length > 0 && (
