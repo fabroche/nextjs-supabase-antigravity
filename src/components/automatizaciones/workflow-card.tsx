@@ -25,10 +25,10 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
       <Card className="hover:bg-accent/50 transition-colors cursor-pointer h-full">
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-start gap-2 min-w-0">
               <span
                 className={cn(
-                  "shrink-0 h-2.5 w-2.5 rounded-full",
+                  "shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full",
                   getStatusDot(workflow)
                 )}
               />
