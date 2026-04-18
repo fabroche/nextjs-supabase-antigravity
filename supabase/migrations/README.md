@@ -22,7 +22,9 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 8 | `008_automatizaciones_schema.sql` | N8N analytics: `n8n_instances`, `n8n_workflows`, `n8n_executions`, `model_pricing`, `custom_metrics`, views, RPC, seed pricing. Adds `business_id` to `activity_feed` |
 | 9 | `009_activity_feed_replica_identity.sql` | `REPLICA IDENTITY FULL` on `activity_feed` + `notifications` so Supabase Realtime broadcasts UPDATE events under RLS |
 | 10 | `010_date_range_filtering.sql` | `get_execution_trend` RPC extended with `p_from`/`p_to` params; new `get_workflow_metrics_by_range` RPC for date-scoped workflow KPIs |
-| 11 | `011_n8n_archived.sql` | Adds `archived_at TIMESTAMPTZ` to `n8n_instances` for soft-delete. RLS admin policy already in migration 008 — no new policy. Rollback: `011_n8n_archived_rollback.sql` |
+| 11 | `011_n8n_archived.sql` | Adds `archived_at TIMESTAMPTZ` to `n8n_instances` for soft-delete. RLS admin policy already in migration 008 — no new policy. Rollback: `rollback_011_n8n_archived.sql` |
+| 12 | `012_metric_registry_and_ui_prefs.sql` | Creates `metric_definitions` table (12 seed rows: 4 keys × 3 scopes) + `ui_preferences JSONB` on `user_profiles` for per-user metric visibility. RLS: users own their prefs; admin can manage definitions. |
+| 13 | `013_user_profiles_avatar.sql` | Adds `avatar_url TEXT` to `user_profiles` for Supabase Storage avatar uploads. |
 
 ---
 
@@ -171,7 +173,9 @@ The admin user is configured as `genzai.cloud@gmail.com` in both:
 | 2026-04-13 | 009_activity_feed_replica_identity.sql | Executed | REPLICA IDENTITY FULL on activity_feed + notifications. Required for Realtime to broadcast UPDATE events on RLS-enabled tables. Fixes enrichment UPDATEs not reaching the dashboard |
 | 2026-04-15 | 010_date_range_filtering.sql | Executed | get_execution_trend date range params + get_workflow_metrics_by_range RPC |
 | 2026-04-17 | 011_n8n_archived.sql | **Pending** | Sprint 3-MAX PR1 — soft-delete for n8n_instances. Run in Supabase Studio SQL Editor. |
+| 2026-04-18 | 012_metric_registry_and_ui_prefs.sql | **Pending** | Sprint 3-MAX PR2 — metric_definitions table + ui_preferences on user_profiles. Run in Supabase Studio SQL Editor. |
+| 2026-04-18 | 013_user_profiles_avatar.sql | **Pending** | Sprint 3-MAX PR3 — avatar_url on user_profiles. Also requires: create `avatars` storage bucket (public, 2 MB, png/jpg/webp). Run in Supabase Studio SQL Editor. |
 
 ---
 
-_Last Updated: 2026-04-17_
+_Last Updated: 2026-04-18_

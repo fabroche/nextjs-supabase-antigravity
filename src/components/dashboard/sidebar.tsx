@@ -16,7 +16,10 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useBusiness } from "@/contexts/business-context"
+import { fetchUserProfile } from "@/lib/supabase/queries"
+import type { DbUserProfile } from "@/lib/supabase/types"
 
 const mainNav = [
   { title: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -63,10 +66,31 @@ interface SidebarProps {
   className?: string
 }
 
+function useProfile() {
+  const [profile, setProfile] = React.useState<DbUserProfile | null>(null)
+  React.useEffect(() => {
+    fetchUserProfile().then(setProfile).catch(() => {})
+  }, [])
+  return profile
+}
+
+function getInitials(profile: DbUserProfile | null): string {
+  if (profile?.full_name) {
+    return profile.full_name
+      .split(" ")
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase()
+  }
+  return "?"
+}
+
 export function Sidebar({ className }: SidebarProps) {
   const [collapsed, setCollapsed] = React.useState(false)
   const pathname = usePathname()
   const { isAdmin } = useBusiness()
+  const profile = useProfile()
 
   function isActive(href: string) {
     return href === "/" ? pathname === "/" : pathname.startsWith(href)
@@ -146,6 +170,22 @@ export function Sidebar({ className }: SidebarProps) {
           </div>
         )}
       </nav>
+
+      {/* User avatar strip */}
+      <div className={cn(
+        "border-t p-3 flex items-center gap-3",
+        collapsed && "justify-center"
+      )}>
+        <Avatar className="h-8 w-8 shrink-0">
+          <AvatarImage src={profile?.avatar_url ?? undefined} alt="Avatar" />
+          <AvatarFallback className="text-xs">{getInitials(profile)}</AvatarFallback>
+        </Avatar>
+        {!collapsed && (
+          <span className="text-sm text-muted-foreground truncate">
+            {profile?.full_name ?? "Mi cuenta"}
+          </span>
+        )}
+      </div>
     </aside>
   )
 }

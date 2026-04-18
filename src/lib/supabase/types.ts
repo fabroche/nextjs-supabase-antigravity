@@ -88,6 +88,7 @@ export interface DbUserProfile {
   telegram_id: string | null
   notion_person_id: string | null
   ui_preferences: UiPreferences
+  avatar_url: string | null
   updated_at: string
 }
 

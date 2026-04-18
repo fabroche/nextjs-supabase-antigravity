@@ -142,11 +142,22 @@ export async function fetchUserProfile(): Promise<DbUserProfile | null> {
   if (!user) return null
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, full_name, role, telegram_id, notion_person_id, ui_preferences, updated_at')
+    .select('id, full_name, role, telegram_id, notion_person_id, ui_preferences, avatar_url, updated_at')
     .eq('id', user.id)
     .single()
   if (error) throw error
   return data
+}
+
+export async function updateAvatarUrl(avatarUrl: string): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', user.id)
+  if (error) throw error
 }
 
 // UI preferences only (for metric visibility hook)
