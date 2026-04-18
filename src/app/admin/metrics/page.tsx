@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { useBusiness } from "@/contexts/business-context"
-import { fetchAllMetricDefinitions, fetchCustomMetricsList } from "@/lib/supabase/queries"
+import { fetchAllMetricDefinitions, fetchCustomMetricsList, toggleCustomMetricActive } from "@/lib/supabase/queries"
+import { Switch } from "@/components/ui/switch"
 import type { DbMetricDefinition, DbCustomMetric } from "@/lib/supabase/types"
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -118,14 +119,25 @@ export default function AdminMetricsPage() {
               ) : (
                 <div className="divide-y">
                   {customMetrics.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="text-sm font-medium">{m.name}</p>
+                    <div key={m.id} className="flex items-center justify-between py-3 gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{m.name}</p>
                         <p className="text-xs text-muted-foreground">{m.slug}</p>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        {FORMAT_LABELS[m.display_format] ?? m.display_format}
-                      </Badge>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Badge variant="outline" className="text-xs">
+                          {FORMAT_LABELS[m.display_format] ?? m.display_format}
+                        </Badge>
+                        <Switch
+                          checked={m.is_active}
+                          onCheckedChange={async (v) => {
+                            await toggleCustomMetricActive(m.id, v)
+                            setCustomMetrics((prev) =>
+                              prev.map((x) => x.id === m.id ? { ...x, is_active: v } : x)
+                            )
+                          }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

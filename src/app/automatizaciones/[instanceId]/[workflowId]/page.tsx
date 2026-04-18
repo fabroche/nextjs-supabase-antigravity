@@ -8,6 +8,7 @@ import { es } from "date-fns/locale"
 import { ChevronRight } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { WorkflowMetrics } from "@/components/automatizaciones/workflow-metrics"
+import { CustomMetricCards } from "@/components/automatizaciones/custom-metric-cards"
 import { ExecutionTrendChart } from "@/components/automatizaciones/execution-trend-chart"
 import { ExecutionFiltersBar } from "@/components/automatizaciones/execution-filters"
 import { ExecutionTable } from "@/components/automatizaciones/execution-table"
@@ -201,6 +202,8 @@ export default function WorkflowDetailPage() {
         isRangeLoading={isRangeMetricsLoading}
         dateRange={activeRange}
       />
+
+      <CustomMetricCards workflowId={workflowId} dateRange={activeRange} />
 
       <ExecutionTrendChart
         data={trend}

@@ -14,6 +14,7 @@ export interface PdfReportSections {
   metrics:          boolean
   trendChart:       boolean
   aggregateSummary: boolean
+  businessMetrics:  boolean
 }
 
 export interface PdfReportHeader {
@@ -26,12 +27,13 @@ export interface PdfReportHeader {
 }
 
 interface WorkflowReportProps {
-  header:      PdfReportHeader
-  sections:    PdfReportSections
-  metrics?:    DbWorkflowMetricsByRange | null
-  metricDefs?: { key: string; label: string; format: string }[]
-  chartImage?: string | null
-  generatedAt: string
+  header:             PdfReportHeader
+  sections:           PdfReportSections
+  metrics?:           DbWorkflowMetricsByRange | null
+  metricDefs?:        { key: string; label: string; format: string }[]
+  customMetricRows?:  { label: string; value: string }[]
+  chartImage?:        string | null
+  generatedAt:        string
 }
 
 function makeStyles(C: ReturnType<typeof getPdfColors>) {
@@ -96,6 +98,7 @@ export function WorkflowPdfReport({
   sections,
   metrics,
   metricDefs = [],
+  customMetricRows = [],
   chartImage,
   generatedAt,
 }: WorkflowReportProps) {
@@ -160,6 +163,23 @@ export function WorkflowPdfReport({
                 </View>
               ))}
             </View>
+          </>
+        )}
+
+        {/* Business metrics section */}
+        {sections.businessMetrics && customMetricRows.length > 0 && (
+          <>
+            <Text style={s.sectionTitle}>Métricas de negocio</Text>
+            <View style={s.tableHeader}>
+              <Text style={[s.tableColLabel, { fontFamily: PDF_FONTS.bold }]}>Métrica</Text>
+              <Text style={[s.tableColValue]}>Valor</Text>
+            </View>
+            {customMetricRows.map((row) => (
+              <View key={row.label} style={s.tableRow}>
+                <Text style={s.tableColLabel}>{row.label}</Text>
+                <Text style={s.tableColValue}>{row.value}</Text>
+              </View>
+            ))}
           </>
         )}
 

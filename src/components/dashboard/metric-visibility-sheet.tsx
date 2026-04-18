@@ -51,7 +51,7 @@ export function MetricVisibilitySheet({
           {definitions.map((def) => {
             const hidden = hiddenKeys.includes(def.key)
             return (
-              <div key={def.key} className="flex items-center justify-between">
+              <div key={def.key} className="flex items-center justify-between px-3 py-1">
                 <Label htmlFor={`metric-${def.key}`} className="font-normal cursor-pointer">
                   {def.label}
                 </Label>
