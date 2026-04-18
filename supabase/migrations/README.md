@@ -25,6 +25,7 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 11 | `011_n8n_archived.sql` | Adds `archived_at TIMESTAMPTZ` to `n8n_instances` for soft-delete. RLS admin policy already in migration 008 — no new policy. Rollback: `rollback_011_n8n_archived.sql` |
 | 12 | `012_metric_registry_and_ui_prefs.sql` | Creates `metric_definitions` table (12 seed rows: 4 keys × 3 scopes) + `ui_preferences JSONB` on `user_profiles` for per-user metric visibility. RLS: users own their prefs; admin can manage definitions. |
 | 13 | `013_user_profiles_avatar.sql` | Adds `avatar_url TEXT` to `user_profiles` for Supabase Storage avatar uploads. |
+| 14 | `014_custom_metrics_agendador.sql` | 4 RPCs de métricas de dominio por `event_type` (Mensaje_Respondido, Cita_Confirmada, Cancelacion, Consulta_Disponibilidad) + registros en `custom_metrics` para el workflow Agente Agendador. |
 
 ---
 
@@ -175,6 +176,7 @@ The admin user is configured as `genzai.cloud@gmail.com` in both:
 | 2026-04-17 | 011_n8n_archived.sql | **Pending** | Sprint 3-MAX PR1 — soft-delete for n8n_instances. Run in Supabase Studio SQL Editor. |
 | 2026-04-18 | 012_metric_registry_and_ui_prefs.sql | **Pending** | Sprint 3-MAX PR2 — metric_definitions table + ui_preferences on user_profiles. Run in Supabase Studio SQL Editor. |
 | 2026-04-18 | 013_user_profiles_avatar.sql | **Pending** | Sprint 3-MAX PR3 — avatar_url on user_profiles. Also requires: create `avatars` storage bucket (public, 2 MB, png/jpg/webp). Run in Supabase Studio SQL Editor. |
+| 2026-04-18 | 014_custom_metrics_agendador.sql | **Pending** | 4 RPCs + registros custom_metrics para workflow Agente Agendador. Run in Supabase Studio SQL Editor. |
 
 ---
 
