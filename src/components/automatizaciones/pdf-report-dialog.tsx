@@ -45,6 +45,7 @@ export function PdfReportDialog({
   const [title,       setTitle]       = useState(`Reporte — ${workflow.name}`)
   const [subtitle,    setSubtitle]    = useState("")
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait")
+  const [colorScheme, setColorScheme] = useState<"dark" | "light">("dark")
   const [sections, setSections] = useState({ metrics: true, trendChart: true, aggregateSummary: false })
   const [generating, setGenerating]   = useState(false)
   const [error, setError]             = useState<string | null>(null)
@@ -78,6 +79,7 @@ export function PdfReportDialog({
           subtitle,
           dateRange: { from: defaultFrom, to: defaultTo },
           orientation,
+          colorScheme,
           businessName: selectedBusiness?.name ?? 'Dashboard',
         },
         sections,
@@ -126,6 +128,19 @@ export function PdfReportDialog({
               <SelectContent>
                 <SelectItem value="portrait">Vertical (Portrait)</SelectItem>
                 <SelectItem value="landscape">Horizontal (Landscape)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Paleta de color</Label>
+            <Select value={colorScheme} onValueChange={(v) => setColorScheme(v as "dark" | "light")}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dark">Oscuro</SelectItem>
+                <SelectItem value="light">Claro</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -7,43 +7,8 @@ import {
   Image,
   StyleSheet,
 } from '@react-pdf/renderer'
-import { PDF_COLORS, PDF_FONTS, PDF_SIZES } from './theme'
+import { getPdfColors, PDF_FONTS, PDF_SIZES, type PdfColorScheme } from './theme'
 import type { DbWorkflowMetricsByRange } from '@/lib/supabase/types'
-
-const s = StyleSheet.create({
-  page: {
-    fontFamily: PDF_FONTS.regular,
-    backgroundColor: PDF_COLORS.background,
-    color: PDF_COLORS.foreground,
-    paddingHorizontal: PDF_SIZES.page.paddingH,
-    paddingVertical: PDF_SIZES.page.paddingV,
-    fontSize: 10,
-  },
-  // Cover
-  coverBusiness: { fontSize: 11, color: PDF_COLORS.mutedForeground, marginBottom: 8 },
-  coverTitle:    { fontSize: 22, fontFamily: PDF_FONTS.bold, marginBottom: 6 },
-  coverSub:      { fontSize: 11, color: PDF_COLORS.mutedForeground, marginBottom: 4 },
-  coverDate:     { fontSize: 9,  color: PDF_COLORS.mutedForeground, marginTop: 32 },
-  coverDivider:  { borderBottomWidth: 1, borderBottomColor: PDF_COLORS.border, marginTop: 16, marginBottom: 32 },
-  // Section
-  sectionTitle:  { fontSize: 13, fontFamily: PDF_FONTS.bold, marginBottom: 10, marginTop: PDF_SIZES.sectionGap },
-  // Metrics grid
-  metricsRow:    { flexDirection: 'row', gap: 10, marginBottom: 10 },
-  metricCard:    { flex: 1, backgroundColor: PDF_COLORS.muted, borderRadius: PDF_SIZES.cardRadius, padding: 12 },
-  metricLabel:   { fontSize: 8, color: PDF_COLORS.mutedForeground, marginBottom: 4 },
-  metricValue:   { fontSize: 18, fontFamily: PDF_FONTS.bold },
-  metricSub:     { fontSize: 8, color: PDF_COLORS.mutedForeground, marginTop: 2 },
-  // Chart
-  chartImage:    { width: '100%', borderRadius: PDF_SIZES.cardRadius, marginTop: 4 },
-  // Summary table
-  tableHeader:   { flexDirection: 'row', backgroundColor: PDF_COLORS.muted, borderRadius: PDF_SIZES.cardRadius, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 2 },
-  tableRow:      { flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: PDF_COLORS.border },
-  tableColLabel: { flex: 1, color: PDF_COLORS.mutedForeground },
-  tableColValue: { fontFamily: PDF_FONTS.bold },
-  // Footer
-  footer:        { position: 'absolute', bottom: 28, left: PDF_SIZES.page.paddingH, right: PDF_SIZES.page.paddingH, flexDirection: 'row', justifyContent: 'space-between' },
-  footerText:    { fontSize: 8, color: PDF_COLORS.mutedForeground },
-})
 
 export interface PdfReportSections {
   metrics:          boolean
@@ -52,11 +17,12 @@ export interface PdfReportSections {
 }
 
 export interface PdfReportHeader {
-  title:       string
-  subtitle:    string
-  dateRange:   { from: Date; to: Date }
-  orientation: 'portrait' | 'landscape'
+  title:        string
+  subtitle:     string
+  dateRange:    { from: Date; to: Date }
+  orientation:  'portrait' | 'landscape'
   businessName: string
+  colorScheme:  PdfColorScheme
 }
 
 interface WorkflowReportProps {
@@ -66,6 +32,43 @@ interface WorkflowReportProps {
   metricDefs?: { key: string; label: string; format: string }[]
   chartImage?: string | null
   generatedAt: string
+}
+
+function makeStyles(C: ReturnType<typeof getPdfColors>) {
+  return StyleSheet.create({
+    page: {
+      fontFamily: PDF_FONTS.regular,
+      backgroundColor: C.background,
+      color: C.foreground,
+      paddingHorizontal: PDF_SIZES.page.paddingH,
+      paddingVertical: PDF_SIZES.page.paddingV,
+      fontSize: 10,
+    },
+    // Cover
+    coverBusiness: { fontSize: 11, color: C.mutedForeground, marginBottom: 8 },
+    coverTitle:    { fontSize: 22, fontFamily: PDF_FONTS.bold, marginBottom: 6 },
+    coverSub:      { fontSize: 11, color: C.mutedForeground, marginBottom: 4 },
+    coverDate:     { fontSize: 9,  color: C.mutedForeground, marginTop: 32 },
+    coverDivider:  { borderBottomWidth: 1, borderBottomColor: C.border, marginTop: 16, marginBottom: 32 },
+    // Section
+    sectionTitle:  { fontSize: 13, fontFamily: PDF_FONTS.bold, marginBottom: 10, marginTop: PDF_SIZES.sectionGap },
+    // Metrics grid
+    metricsRow:    { flexDirection: 'row', gap: 10, marginBottom: 10 },
+    metricCard:    { flex: 1, backgroundColor: C.muted, borderRadius: PDF_SIZES.cardRadius, padding: 12 },
+    metricLabel:   { fontSize: 8, color: C.mutedForeground, marginBottom: 4 },
+    metricValue:   { fontSize: 18, fontFamily: PDF_FONTS.bold },
+    metricSub:     { fontSize: 8, color: C.mutedForeground, marginTop: 2 },
+    // Chart
+    chartImage:    { width: '100%', borderRadius: PDF_SIZES.cardRadius, marginTop: 4 },
+    // Summary table
+    tableHeader:   { flexDirection: 'row', backgroundColor: C.muted, borderRadius: PDF_SIZES.cardRadius, paddingHorizontal: 10, paddingVertical: 6, marginBottom: 2 },
+    tableRow:      { flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: C.border },
+    tableColLabel: { flex: 1, color: C.mutedForeground },
+    tableColValue: { fontFamily: PDF_FONTS.bold },
+    // Footer
+    footer:        { position: 'absolute', bottom: 28, left: PDF_SIZES.page.paddingH, right: PDF_SIZES.page.paddingH, flexDirection: 'row', justifyContent: 'space-between' },
+    footerText:    { fontSize: 8, color: C.mutedForeground },
+  })
 }
 
 function fmt(format: string, value: number): string {
@@ -96,6 +99,8 @@ export function WorkflowPdfReport({
   chartImage,
   generatedAt,
 }: WorkflowReportProps) {
+  const C = getPdfColors(header.colorScheme)
+  const s = makeStyles(C)
   const rangeLabel = `${fmtDate(header.dateRange.from)} – ${fmtDate(header.dateRange.to)}`
 
   const summaryRows = metrics
@@ -185,7 +190,7 @@ export function WorkflowPdfReport({
 
         {/* No data fallback */}
         {!metrics && (sections.metrics || sections.aggregateSummary) && (
-          <Text style={{ color: PDF_COLORS.mutedForeground, marginTop: 20 }}>
+          <Text style={{ color: C.mutedForeground, marginTop: 20 }}>
             Sin datos en el rango seleccionado.
           </Text>
         )}
