@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
@@ -19,7 +19,10 @@ import {
   fetchExecutionTrend,
   fetchExecutions,
   fetchWorkflowMetricsByRange,
+  fetchMetricDefinitions,
 } from "@/lib/supabase/queries"
+import { useBusiness } from "@/contexts/business-context"
+import { DEFAULT_METRIC_DEFINITIONS } from "@/lib/metric-defaults"
 import { Skeleton } from "@/components/ui/skeleton"
 import type {
   DbInstanceStats,
@@ -27,12 +30,15 @@ import type {
   DbWorkflowMetricsByRange,
   DbN8NExecution,
   DbExecutionTrend,
+  DbMetricDefinition,
   ExecutionFilters,
 } from "@/lib/supabase/types"
 
 export default function WorkflowDetailPage() {
   const params = useParams<{ instanceId: string; workflowId: string }>()
   const { instanceId, workflowId } = params
+  const { selectedBusiness } = useBusiness()
+  const chartRef = useRef<HTMLDivElement>(null)
 
   const [instance, setInstance] = useState<DbInstanceStats | null>(null)
   const [workflow, setWorkflow] = useState<DbWorkflowStats | null>(null)
@@ -46,7 +52,14 @@ export default function WorkflowDetailPage() {
   const [isTrendLoading, setIsTrendLoading] = useState(true)
   const [isRangeMetricsLoading, setIsRangeMetricsLoading] = useState(false)
   const [isTableLoading, setIsTableLoading] = useState(true)
+  const [metricDefs, setMetricDefs] = useState<DbMetricDefinition[]>(DEFAULT_METRIC_DEFINITIONS.workflow)
   const { lastExecutionAt } = useN8NExecutions()
+
+  useEffect(() => {
+    fetchMetricDefinitions("workflow", selectedBusiness?.id)
+      .then((defs) => { if (defs.length > 0) setMetricDefs(defs) })
+      .catch(() => {})
+  }, [selectedBusiness?.id])
 
   // Load breadcrumb + static metrics (all-time view)
   useEffect(() => {
@@ -194,6 +207,7 @@ export default function WorkflowDetailPage() {
         isLoading={isTrendLoading}
         title="Tendencia de ejecuciones"
         description={trendDescription}
+        chartRef={chartRef}
       />
 
       <div className="space-y-3">
@@ -205,6 +219,10 @@ export default function WorkflowDetailPage() {
           <ExportExecutionsButton
             data={executions}
             workflowName={workflow?.name ?? "workflow"}
+            workflow={workflow}
+            activeRange={activeRange}
+            chartRef={chartRef}
+            metricDefs={metricDefs}
           />
         </div>
         <ExecutionTable

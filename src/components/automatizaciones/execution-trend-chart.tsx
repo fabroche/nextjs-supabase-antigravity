@@ -1,5 +1,6 @@
 "use client"
 
+import { type RefObject } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import {
@@ -20,6 +21,7 @@ interface ExecutionTrendChartProps {
   isLoading: boolean
   title?: string
   description?: string
+  chartRef?: RefObject<HTMLDivElement | null>
 }
 
 export function ExecutionTrendChart({
@@ -27,6 +29,7 @@ export function ExecutionTrendChart({
   isLoading,
   title = "Tendencia de ejecuciones",
   description = "Últimos 30 días — exitosas vs errores",
+  chartRef,
 }: ExecutionTrendChartProps) {
   const formatted = data.map((d) => ({
     ...d,
@@ -47,7 +50,7 @@ export function ExecutionTrendChart({
             Sin datos de ejecución en los últimos 30 días
           </div>
         ) : (
-          <div className="h-[250px]">
+          <div className="h-[250px]" ref={chartRef}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={formatted}>
                 <defs>

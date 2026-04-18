@@ -1,5 +1,7 @@
 "use client"
 
+import { useState, useEffect } from "react"
+import Link from "next/link"
 import { User, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,10 +26,17 @@ import { signOut } from "@/lib/auth/actions"
 import { useBusiness } from "@/contexts/business-context"
 import { useAuth } from "@/contexts/auth-context"
 import { NotificationBell } from "@/components/notifications/notification-bell"
+import { fetchUserProfile } from "@/lib/supabase/queries"
+import type { DbUserProfile } from "@/lib/supabase/types"
 
 export function Header() {
   const { user } = useAuth()
   const { selectedBusiness, selectBusinessById, businesses, isAdmin, isLoading } = useBusiness()
+  const [profile, setProfile] = useState<DbUserProfile | null>(null)
+
+  useEffect(() => {
+    fetchUserProfile().then(setProfile).catch(() => {})
+  }, [])
 
   async function handleSignOut() {
     await signOut()
@@ -63,9 +72,11 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
-                <AvatarImage src="/avatar.png" alt="User" />
+                <AvatarImage src={profile?.avatar_url ?? undefined} alt="User" />
                 <AvatarFallback>
-                  {user?.email ? user.email[0].toUpperCase() : "U"}
+                  {profile?.full_name
+                    ? profile.full_name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+                    : user?.email?.[0].toUpperCase() ?? "U"}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -80,11 +91,12 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              Perfil
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <User className="mr-2 h-4 w-4" />
+                Perfil
+              </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="text-destructive"

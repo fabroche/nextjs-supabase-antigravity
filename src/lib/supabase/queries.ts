@@ -18,6 +18,9 @@ import type {
   DbExecutionTrend,
   AutomationGlobalMetrics,
   ExecutionFilters,
+  DbMetricDefinition,
+  MetricScope,
+  UiPreferences,
 } from './types'
 
 // Get the authenticated user's role ('admin' | 'negocio')
@@ -139,11 +142,47 @@ export async function fetchUserProfile(): Promise<DbUserProfile | null> {
   if (!user) return null
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, full_name, role, telegram_id, notion_person_id, updated_at')
+    .select('id, full_name, role, telegram_id, notion_person_id, ui_preferences, avatar_url, updated_at')
     .eq('id', user.id)
     .single()
   if (error) throw error
   return data
+}
+
+export async function updateAvatarUrl(avatarUrl: string): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', user.id)
+  if (error) throw error
+}
+
+// UI preferences only (for metric visibility hook)
+export async function fetchUiPreferences(): Promise<UiPreferences> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return {}
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('ui_preferences')
+    .eq('id', user.id)
+    .single()
+  if (error) return {}
+  return (data?.ui_preferences as UiPreferences) ?? {}
+}
+
+export async function updateUiPreferences(prefs: UiPreferences): Promise<void> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ ui_preferences: prefs })
+    .eq('id', user.id)
+  if (error) throw error
 }
 
 // Update current user's profile fields
@@ -223,9 +262,13 @@ export async function markAllNotificationsRead(userId: string): Promise<void> {
 export const EXECUTIONS_PAGE_SIZE = 20
 
 // Level 1 — all instances with aggregated stats (view: n8n_instance_stats)
+// Only non-archived instances are shown
 export async function fetchInstanceStats(businessId?: string): Promise<DbInstanceStats[]> {
   const supabase = createClient()
-  let query = supabase.from('n8n_instance_stats').select('*').order('name')
+  let query = supabase
+    .from('n8n_instance_stats')
+    .select('*')
+    .order('name')
   if (businessId) query = query.eq('business_id', businessId)
   const { data, error } = await query
   if (error) throw error
@@ -363,6 +406,163 @@ export async function fetchExecutionTrend(
     p_from: from?.toISOString() ?? null,
     p_to: to?.toISOString() ?? null,
   })
+  if (error) throw error
+  return data || []
+}
+
+// ============================================================
+// N8N Instances CRUD (admin only)
+// ============================================================
+
+export interface CreateN8NInstanceInput {
+  business_id: string
+  instance_id: string
+  name: string
+  environment: 'production' | 'staging' | 'development'
+  api_base_url?: string
+  api_key?: string
+}
+
+export interface UpdateN8NInstanceInput {
+  id: string
+  name?: string
+  environment?: 'production' | 'staging' | 'development'
+  api_base_url?: string
+  api_key?: string
+}
+
+export async function createN8NInstance(input: CreateN8NInstanceInput): Promise<DbN8NInstance> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('n8n_instances')
+    .insert({
+      business_id: input.business_id,
+      instance_id: input.instance_id,
+      name: input.name,
+      environment: input.environment,
+      api_base_url: input.api_base_url || null,
+      api_key: input.api_key || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateN8NInstance(input: UpdateN8NInstanceInput): Promise<void> {
+  const supabase = createClient()
+  const updates: Record<string, unknown> = {}
+  if (input.name !== undefined) updates.name = input.name
+  if (input.environment !== undefined) updates.environment = input.environment
+  if (input.api_base_url !== undefined) updates.api_base_url = input.api_base_url || null
+  if (input.api_key !== undefined && input.api_key !== '') updates.api_key = input.api_key
+  const { error } = await supabase
+    .from('n8n_instances')
+    .update(updates)
+    .eq('id', input.id)
+  if (error) throw error
+}
+
+export async function archiveN8NInstance(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('n8n_instances')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// Fetch all non-archived instances for CRUD management (returns full row incl. api_key mask)
+export async function fetchN8NInstances(businessId?: string): Promise<DbN8NInstance[]> {
+  const supabase = createClient()
+  let query = supabase
+    .from('n8n_instances')
+    .select('*')
+    .is('archived_at', null)
+    .order('name')
+  if (businessId) query = query.eq('business_id', businessId)
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+// ============================================================
+// Metric definitions registry (migration 012)
+// ============================================================
+
+// Returns metric definitions for a scope, resolving business overrides.
+// Row with matching business_id wins over row with business_id IS NULL (preset).
+export async function fetchMetricDefinitions(
+  scope: MetricScope,
+  businessId?: string,
+): Promise<DbMetricDefinition[]> {
+  const supabase = createClient()
+  // Fetch both presets (business_id IS NULL) and business overrides in one query
+  let query = supabase
+    .from('metric_definitions')
+    .select('*')
+    .eq('scope', scope)
+    .eq('is_active', true)
+    .or(businessId ? `business_id.is.null,business_id.eq.${businessId}` : 'business_id.is.null')
+    .order('display_order', { ascending: true })
+  const { data, error } = await query
+  if (error) throw error
+  const rows = data || []
+  // DISTINCT ON (key): business-specific row wins over global preset
+  const seen = new Map<string, DbMetricDefinition>()
+  for (const row of rows) {
+    const existing = seen.get(row.key)
+    if (!existing || (row.business_id !== null && existing.business_id === null)) {
+      seen.set(row.key, row)
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => a.display_order - b.display_order)
+}
+
+// Fetch ALL metric definitions for admin management (including inactive)
+export async function fetchAllMetricDefinitions(scope?: MetricScope): Promise<DbMetricDefinition[]> {
+  const supabase = createClient()
+  let query = supabase
+    .from('metric_definitions')
+    .select('*')
+    .is('business_id', null)
+    .order('scope')
+    .order('display_order')
+  if (scope) query = query.eq('scope', scope)
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function updateMetricDefinition(
+  id: string,
+  updates: Partial<Pick<DbMetricDefinition, 'label' | 'is_active' | 'display_order'>>
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('metric_definitions')
+    .update(updates)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function reorderMetricDefinitions(
+  items: { id: string; display_order: number }[]
+): Promise<void> {
+  const supabase = createClient()
+  await Promise.all(
+    items.map(({ id, display_order }) =>
+      supabase.from('metric_definitions').update({ display_order }).eq('id', id)
+    )
+  )
+}
+
+export async function fetchCustomMetricsList(): Promise<import('./types').DbCustomMetric[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('custom_metrics')
+    .select('*')
+    .order('name')
   if (error) throw error
   return data || []
 }

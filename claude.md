@@ -11,9 +11,9 @@
 ## Project Overview
 
 **Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Version**: v1.0.0 — Sprint 3 completo. Automatizaciones + Settings + Dead Letters + Activity feed filters  
+**Version**: v1.1.0 — Sprint 3-MAX completo. CRUD instancias N8N + metric registry + PDF report + avatar upload  
 **Next**: Sprint 4 por definir. Pendiente menor: normalizer Notion (webhook llega pero se ignora)  
-**Sprint activo**: ninguno — `SPRINT-3-PLAN.md` cerrado ✅
+**Sprint activo**: ninguno — `SPRINT-3-MAX-PLAN.md` cerrado ✅
 
 ---
 
@@ -216,8 +216,48 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
   - Fases 1-7: schema + pipeline + Automatizaciones UI 3 niveles
   - Migration 010: date range en trend + `get_workflow_metrics_by_range`
   - Fase 8: activity feed filters/pagination, settings panel, dead letters admin, Telegram video chat fix
+- ✅ Sprint 3-MAX completo (2026-04-18) — v1.1.0
+  - PR1: CRUD instancias N8N desde UI (crear, editar, archivar) — migration 011
+  - PR2: Metric registry + toggle UI personal + admin metrics page — migration 012
+  - PR3: PDF report cliente (workflow Level 3) + avatar upload en settings — migration 013
+  - ⚠️ Migrations 011–013 y bucket `avatars` pendientes de aplicar en producción
 - ⏳ Pendiente menor: normalizer Notion (webhooks llegan pero se ignoran)
 - ⏳ Sprint 4: por definir
+
+---
+
+## Sprint 3-MAX — Detalles PR3
+
+### PDF Report
+- `src/lib/pdf/theme.ts` — tokens de color/font/tamaño
+- `src/lib/pdf/workflow-report.tsx` — Document react-pdf: cover, metrics 2x2, chart embed, tabla summary, footer
+- `src/lib/pdf/generate.ts` — `generateWorkflowReport()` → Blob, `downloadBlob()` — importados dinámicamente
+- `src/components/automatizaciones/pdf-report-dialog.tsx` — Dialog config (título, orientación, secciones); captura chart con `html-to-image`
+- `src/components/automatizaciones/export-button.tsx` — Dropdown con CSV + "Reporte PDF (cliente)"
+- `src/app/automatizaciones/[instanceId]/[workflowId]/page.tsx` — `chartRef` → ExecutionTrendChart + ExportButton
+
+### Avatar Upload
+- `src/app/settings/page.tsx` — Tabs (Perfil | Integraciones); avatar upload a bucket `avatars`
+- `src/components/dashboard/sidebar.tsx` — Avatar/initials strip en la parte inferior
+
+### Bucket `avatars` (manual en Supabase Studio)
+```
+Nombre: avatars
+Tipo: Public
+Límite de tamaño: 2 MB
+MIME types permitidos: image/png, image/jpeg, image/webp
+```
+RLS policies necesarias en `storage.objects`:
+```sql
+-- Leer (público)
+CREATE POLICY "avatars_public_read" ON storage.objects FOR SELECT USING (bucket_id = 'avatars');
+-- Subir (usuario autenticado, solo su carpeta)
+CREATE POLICY "avatars_user_upload" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+-- Actualizar
+CREATE POLICY "avatars_user_update" ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+```
 
 ---
 
@@ -231,4 +271,4 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
 
 ---
 
-_Last Updated: 2026-04-17 | Version: 1.0.0_
+_Last Updated: 2026-04-18 | Version: 1.1.0_
