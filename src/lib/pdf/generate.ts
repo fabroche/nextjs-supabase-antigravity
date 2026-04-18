@@ -12,13 +12,15 @@ export async function generateWorkflowReport({
   sections,
   metrics,
   metricDefs,
+  customMetricRows,
   chartImage,
 }: {
-  header:      PdfReportHeader
-  sections:    PdfReportSections
-  metrics:     DbWorkflowMetricsByRange | null
-  metricDefs:  DbMetricDefinition[]
-  chartImage:  string | null
+  header:             PdfReportHeader
+  sections:           PdfReportSections
+  metrics:            DbWorkflowMetricsByRange | null
+  metricDefs:         DbMetricDefinition[]
+  customMetricRows?:  { label: string; value: string }[]
+  chartImage:         string | null
 }): Promise<Blob> {
   const generatedAt = new Date().toLocaleDateString('es', {
     day: '2-digit', month: 'long', year: 'numeric',
@@ -31,6 +33,7 @@ export async function generateWorkflowReport({
     sections,
     metrics,
     metricDefs: defs,
+    customMetricRows,
     chartImage,
     generatedAt,
   })

@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useBusiness } from "@/contexts/business-context"
-import { fetchWorkflowMetricsByRange } from "@/lib/supabase/queries"
+import { fetchWorkflowMetricsByRange, fetchCustomMetricsForWorkflow, fetchWorkflowEventCount } from "@/lib/supabase/queries"
 import type { DbWorkflowStats, DbWorkflowMetricsByRange, DbMetricDefinition } from "@/lib/supabase/types"
 
 interface PdfReportDialogProps {
@@ -46,7 +46,7 @@ export function PdfReportDialog({
   const [subtitle,    setSubtitle]    = useState("")
   const [orientation, setOrientation] = useState<"portrait" | "landscape">("portrait")
   const [colorScheme, setColorScheme] = useState<"dark" | "light">("dark")
-  const [sections, setSections] = useState({ metrics: true, trendChart: true, aggregateSummary: false })
+  const [sections, setSections] = useState({ metrics: true, trendChart: true, aggregateSummary: false, businessMetrics: true })
   const [generating, setGenerating]   = useState(false)
   const [error, setError]             = useState<string | null>(null)
 
@@ -71,7 +71,25 @@ export function PdfReportDialog({
         metrics = await fetchWorkflowMetricsByRange(workflow.id, defaultFrom, defaultTo)
       }
 
-      // 3. Generate PDF (dynamic import to avoid SSR)
+      // 3. Fetch custom metric counts
+      let customMetricRows: { label: string; value: string }[] = []
+      if (sections.businessMetrics) {
+        const customMetrics = await fetchCustomMetricsForWorkflow(workflow.id)
+        customMetricRows = await Promise.all(
+          customMetrics
+            .filter((m) => m.filter_event_type)
+            .map(async (m) => {
+              const count = await fetchWorkflowEventCount(workflow.id, m.filter_event_type!, defaultFrom, defaultTo)
+              const value =
+                m.display_format === "currency" ? `$${count.toFixed(4)}` :
+                m.display_format === "percent"  ? `${count.toFixed(1)}%` :
+                count.toLocaleString()
+              return { label: m.name, value }
+            })
+        )
+      }
+
+      // 4. Generate PDF (dynamic import to avoid SSR)
       const { generateWorkflowReport, downloadBlob } = await import('@/lib/pdf/generate')
       const blob = await generateWorkflowReport({
         header: {
@@ -85,6 +103,7 @@ export function PdfReportDialog({
         sections,
         metrics,
         metricDefs,
+        customMetricRows,
         chartImage,
       })
 
@@ -149,6 +168,7 @@ export function PdfReportDialog({
             <Label>Secciones</Label>
             {[
               { key: "metrics",          label: "Métricas del workflow" },
+              { key: "businessMetrics",  label: "Métricas de negocio (custom)" },
               { key: "trendChart",       label: "Gráfica de tendencia" },
               { key: "aggregateSummary", label: "Resumen agregado de ejecuciones" },
             ].map(({ key, label }) => (
