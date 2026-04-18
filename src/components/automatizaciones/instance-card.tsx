@@ -63,8 +63,9 @@ export function InstanceCard({ instance, fullInstance, onMutated }: InstanceCard
                 >
                   {ENV_LABELS[instance.environment] ?? instance.environment}
                 </Badge>
+                {/* Spacer para mantener el layout cuando no hay menú */}
                 {isAdmin && fullInstance && onMutated && (
-                  <InstanceActionsMenu instance={fullInstance} onMutated={onMutated} />
+                  <div className="h-7 w-7" />
                 )}
               </div>
             </div>
@@ -112,6 +113,16 @@ export function InstanceCard({ instance, fullInstance, onMutated }: InstanceCard
           </CardContent>
         </Card>
       </Link>
+
+      {/* Fuera del Link para evitar que los eventos del Dialog/DropdownMenu naveguen */}
+      {isAdmin && fullInstance && onMutated && (
+        <div
+          className="absolute top-3 right-3"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <InstanceActionsMenu instance={fullInstance} onMutated={onMutated} />
+        </div>
+      )}
     </div>
   )
 }
