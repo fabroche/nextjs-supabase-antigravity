@@ -185,6 +185,7 @@ export interface DbCustomMetric {
   source_field: string | null
   display_format: string
   icon: string | null
+  is_active: boolean
   created_at: string
   updated_at: string
 }

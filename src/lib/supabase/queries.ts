@@ -567,6 +567,49 @@ export async function fetchCustomMetricsList(): Promise<import('./types').DbCust
   return data || []
 }
 
+// Active custom metrics for a specific workflow (Level 3)
+export async function fetchCustomMetricsForWorkflow(
+  workflowId: string
+): Promise<import('./types').DbCustomMetric[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('custom_metrics')
+    .select('*')
+    .eq('workflow_id', workflowId)
+    .eq('is_active', true)
+    .order('name')
+  if (error) throw error
+  return data || []
+}
+
+// Count executions for a workflow filtered by event_type (RPC: get_workflow_event_count)
+export async function fetchWorkflowEventCount(
+  workflowId: string,
+  eventType: string,
+  from?: Date,
+  to?: Date,
+): Promise<number> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc('get_workflow_event_count', {
+    p_workflow_id: workflowId,
+    p_event_type:  eventType,
+    p_from: from?.toISOString() ?? null,
+    p_to:   to?.toISOString()   ?? null,
+  })
+  if (error) throw error
+  return Number(data) || 0
+}
+
+// Toggle is_active on a custom metric (admin only)
+export async function toggleCustomMetricActive(id: string, isActive: boolean): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('custom_metrics')
+    .update({ is_active: isActive })
+    .eq('id', id)
+  if (error) throw error
+}
+
 // Aggregated KPIs for a workflow within an optional date range
 // (RPC: get_workflow_metrics_by_range)
 export async function fetchWorkflowMetricsByRange(
