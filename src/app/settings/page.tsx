@@ -116,9 +116,10 @@ export default function SettingsPage() {
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path)
+      const bustedUrl = `${publicUrl}?t=${Date.now()}`
 
-      await updateAvatarUrl(publicUrl)
-      setProfile((prev) => prev ? { ...prev, avatar_url: publicUrl } : prev)
+      await updateAvatarUrl(bustedUrl)
+      setProfile((prev) => prev ? { ...prev, avatar_url: bustedUrl } : prev)
       setPendingFile(null)
       setAvatarSaved(true)
       setTimeout(() => setAvatarSaved(false), 3000)
