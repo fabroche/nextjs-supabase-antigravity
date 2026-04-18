@@ -13,8 +13,6 @@ import {
   type UpdateInstanceInput,
 } from './n8n-instances.schemas'
 
-export type { CreateInstanceInput, UpdateInstanceInput }
-
 export async function actionCreateInstance(raw: CreateInstanceInput) {
   const parsed = createInstanceSchema.safeParse(raw)
   if (!parsed.success) {
