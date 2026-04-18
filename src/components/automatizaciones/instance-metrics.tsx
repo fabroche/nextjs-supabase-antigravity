@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useBusiness } from "@/contexts/business-context"
 import { useUiPreferences } from "@/hooks/use-ui-preferences"
 import { fetchMetricDefinitions } from "@/lib/supabase/queries"
+import { DEFAULT_METRIC_DEFINITIONS } from "@/lib/metric-defaults"
 import type { DbInstanceStats, DbMetricDefinition } from "@/lib/supabase/types"
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -55,12 +56,12 @@ export function InstanceMetrics({ instance, isLoading }: InstanceMetricsProps) {
   const { selectedBusiness } = useBusiness()
   const scopeKey = instance ? `instance:${instance.id}` : "instance"
   const { isHidden, getHiddenKeys, toggleMetric, showAll } = useUiPreferences()
-  const [definitions, setDefinitions] = useState<DbMetricDefinition[]>([])
+  const [definitions, setDefinitions] = useState<DbMetricDefinition[]>(DEFAULT_METRIC_DEFINITIONS.instance)
 
   useEffect(() => {
     fetchMetricDefinitions("instance", selectedBusiness?.id)
-      .then(setDefinitions)
-      .catch(console.error)
+      .then((defs) => setDefinitions(defs.length > 0 ? defs : DEFAULT_METRIC_DEFINITIONS.instance))
+      .catch(() => setDefinitions(DEFAULT_METRIC_DEFINITIONS.instance))
   }, [selectedBusiness?.id])
 
   if (isLoading || !instance) {
