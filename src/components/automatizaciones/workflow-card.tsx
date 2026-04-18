@@ -28,7 +28,7 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
             <div className="flex items-start gap-2 min-w-0">
               <span
                 className={cn(
-                  "shrink-0 mt-0.5 h-2.5 w-2.5 rounded-full",
+                  "shrink-0 mt-1 h-2.5 w-2.5 rounded-full",
                   getStatusDot(workflow)
                 )}
               />
