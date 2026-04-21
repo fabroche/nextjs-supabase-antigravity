@@ -126,7 +126,7 @@ export default function InstanceDetailPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {workflows.map((wf) => (
-              <WorkflowCard key={wf.id} workflow={wf} />
+              <WorkflowCard key={wf.id} workflow={wf} onMutated={() => loadData()} />
             ))}
           </div>
         )}

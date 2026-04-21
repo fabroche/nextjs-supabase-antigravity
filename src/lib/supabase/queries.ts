@@ -626,3 +626,43 @@ export async function fetchWorkflowMetricsByRange(
   if (error) throw error
   return (data as import('./types').DbWorkflowMetricsByRange[] | null)?.[0] ?? null
 }
+
+// ============================================================
+// Workflow mutations (migration 017)
+// ============================================================
+
+export async function updateWorkflowName(id: string, name: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('n8n_workflows')
+    .update({ name })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function reassignWorkflow(workflowId: string, newInstanceId: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase.rpc('reassign_workflow', {
+    p_workflow_id: workflowId,
+    p_new_instance_id: newInstanceId,
+  })
+  if (error) throw error
+}
+
+export async function archiveWorkflow(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('n8n_workflows')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function unarchiveWorkflow(id: string): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('n8n_workflows')
+    .update({ archived_at: null })
+    .eq('id', id)
+  if (error) throw error
+}
