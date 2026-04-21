@@ -138,6 +138,7 @@ export interface DbN8NWorkflow {
   last_seen_at: string
   created_at: string
   updated_at: string
+  archived_at: string | null
 }
 
 // Table: n8n_executions

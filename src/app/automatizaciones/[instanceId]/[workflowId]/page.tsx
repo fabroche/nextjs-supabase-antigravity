@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -9,6 +9,7 @@ import { ChevronRight } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { WorkflowMetrics } from "@/components/automatizaciones/workflow-metrics"
 import { CustomMetricCards } from "@/components/automatizaciones/custom-metric-cards"
+import { WorkflowActionsMenu } from "@/components/automatizaciones/workflow-actions-menu"
 import { ExecutionTrendChart } from "@/components/automatizaciones/execution-trend-chart"
 import { ExecutionFiltersBar } from "@/components/automatizaciones/execution-filters"
 import { ExecutionTable } from "@/components/automatizaciones/execution-table"
@@ -38,6 +39,7 @@ import type {
 export default function WorkflowDetailPage() {
   const params = useParams<{ instanceId: string; workflowId: string }>()
   const { instanceId, workflowId } = params
+  const router = useRouter()
   const { selectedBusiness } = useBusiness()
   const chartRef = useRef<HTMLDivElement>(null)
 
@@ -192,6 +194,23 @@ export default function WorkflowDetailPage() {
           <span className="text-foreground font-medium">
             {workflow?.name ?? "Workflow"}
           </span>
+        )}
+        {!isLoading && workflow && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <WorkflowActionsMenu
+              workflow={workflow}
+              onMutated={() => {
+                Promise.all([
+                  fetchInstanceStats(),
+                  fetchWorkflowStats(instanceId),
+                ]).then(([allStats, wfStats]) => {
+                  setInstance(allStats.find((s) => s.id === instanceId) ?? null)
+                  setWorkflow(wfStats.find((w) => w.id === workflowId) ?? null)
+                }).catch(console.error)
+              }}
+              onArchived={() => router.push(`/automatizaciones/${instanceId}`)}
+            />
+          </div>
         )}
       </nav>
 
