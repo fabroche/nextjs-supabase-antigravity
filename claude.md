@@ -11,9 +11,9 @@
 ## Project Overview
 
 **Stack**: Next.js 16, TypeScript, Supabase Auth, shadcn/ui, Tailwind CSS v4  
-**Version**: v1.1.0 — Sprint 3-MAX completo. CRUD instancias N8N + metric registry + PDF report + avatar upload  
-**Next**: Sprint 4 por definir. Pendiente menor: normalizer Notion (webhook llega pero se ignora)  
-**Sprint activo**: ninguno — `SPRINT-3-MAX-PLAN.md` cerrado ✅
+**Version**: v1.2.0 — Sprint 5 completo. Métricas agendador + motor configurable + catálogo gobernado de event_type  
+**Next**: por definir. Pendientes: normalizer Notion; idea endpoints con doc `.md` para LLMs (a debatir)  
+**Sprint activo**: ninguno — `SPRINT-5-METRICAS-AGENDADOR-PLAN.md` cerrado ✅
 
 ---
 
@@ -123,7 +123,7 @@ src/
 
 ## Database Schema
 
-**Migrations ejecutadas**: 001–010 en producción. NUNCA re-ejecutar.
+**Migrations ejecutadas**: 001–022 en producción. NUNCA re-ejecutar.
 
 | Tabla | Propósito |
 |-------|-----------|
@@ -241,13 +241,18 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
 - ✅ Hotfix coerción numérica webhook N8N (2026-06-28): `Number()`/parseo boolean en
   `normalizeN8N` + `processN8NExecution`. Recuperadas 218 ejecuciones de dead_letters
   (fechas originales preservadas). Ver gotcha "N8N envía números como strings".
+- ✅ Sprint 5 completo (2026-06-28) — v1.2.0 — `SPRINT-5-METRICAS-AGENDADOR-PLAN.md`
+  - PR1 (#19): `chat_id` + `is_out_of_hours` en `n8n_executions` + backfill — migración 018
+  - PR2 (#20): catálogo gobernado `event_types`/`event_type_rules` + `GET /api/event-types` — migración 019
+  - PR3 (#21): motor configurable `compute_metric` + reseed 7 métricas agendador (corrige targeting 014) — migración 020
+  - PR4 (#22): panel admin catálogo + auto-descubrimiento `discover_untracked_event_types` — migración 021
+  - PR5 (#23): métricas internas Genzai + motor generalizado (ratio sum/count, sum multi-campo, status) — migración 022
+  - Diseño en `temporal/`: `validacion-metricas-agendador.md`, `SOP-n8n-metric-logger.md`
+- ⏳ Acción N8N pendiente (ver SOP): mandar números sin comillas, separar `Reprogramacion`,
+  alinear `instance_id` del Error Reporter, leer catálogo vía `/api/event-types`
 - ⏳ Pendiente menor: normalizer Notion (webhooks llegan pero se ignoran)
-- 💡 Idea a debatir (tras Sprint 5): endpoints que devuelvan su propia doc en `.md` lista para
-  consumo por LLMs (ej. `?format=md` / `Accept: text/markdown`). Empezar por endpoints N8N.
-- ⏳ Sprint 5 planificado: métricas Agendador Gipsy + motor configurable + catálogo gobernado de
-  event_type → `SPRINT-5-METRICAS-AGENDADOR-PLAN.md` (diseño en `temporal/`:
-  `validacion-metricas-agendador.md`, `SOP-n8n-metric-logger.md`)
-- ⏳ Sprint 4: por definir
+- 💡 Idea a debatir: endpoints que devuelvan su propia doc en `.md` para LLMs (`?format=md` / `Accept: text/markdown`)
+- ⏳ Sprint 4 (Tickets Email): `SPRINT-4-PLAN.md` sin ejecutar; Sprint 6+: por definir
 
 ---
 
@@ -296,4 +301,4 @@ CREATE POLICY "avatars_user_update" ON storage.objects FOR UPDATE TO authenticat
 
 ---
 
-_Last Updated: 2026-06-28 | Version: 1.1.0_
+_Last Updated: 2026-06-28 | Version: 1.2.0_
