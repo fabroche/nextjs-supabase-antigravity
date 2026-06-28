@@ -203,7 +203,7 @@ export interface DbEventType {
   is_default: boolean
   created_at: string
   updated_at: string
-  n8n_workflows?: { name: string } | null
+  n8n_workflows?: { name: string; n8n_instances?: { name: string } | null } | null
 }
 
 // Tipo descubierto en n8n_executions que aún no está en el catálogo

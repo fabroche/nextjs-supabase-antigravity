@@ -629,12 +629,12 @@ export async function toggleCustomMetricActive(id: string, isActive: boolean): P
 
 // ── Catálogo gobernado de event_type (admin) ──────────────────────────────
 
-// Todo el catálogo, con el nombre del workflow (join)
+// Todo el catálogo, con el nombre del workflow y su instancia (join anidado)
 export async function fetchEventTypesAll(): Promise<import('./types').DbEventType[]> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('event_types')
-    .select('*, n8n_workflows(name)')
+    .select('*, n8n_workflows(name, n8n_instances(name))')
     .order('category')
     .order('key')
   if (error) throw error
@@ -650,15 +650,17 @@ export async function fetchUntrackedEventTypes(): Promise<import('./types').Untr
 }
 
 // Alta de un tipo en el catálogo (clasificar un pendiente). Admin only via RLS.
+// status='archived' = "ignorar" (queda registrado pero fuera del vocabulario activo).
 export async function classifyEventType(
   workflowId: string,
   key: string,
   category: 'business' | 'system',
+  status: 'active' | 'archived' = 'active',
 ): Promise<void> {
   const supabase = createClient()
   const { error } = await supabase
     .from('event_types')
-    .insert({ workflow_id: workflowId, key, category, status: 'active' })
+    .insert({ workflow_id: workflowId, key, category, status })
   if (error) throw error
 }
 
