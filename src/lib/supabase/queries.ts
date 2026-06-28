@@ -627,6 +627,54 @@ export async function toggleCustomMetricActive(id: string, isActive: boolean): P
   if (error) throw error
 }
 
+// ── Catálogo gobernado de event_type (admin) ──────────────────────────────
+
+// Todo el catálogo, con el nombre del workflow (join)
+export async function fetchEventTypesAll(): Promise<import('./types').DbEventType[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('event_types')
+    .select('*, n8n_workflows(name)')
+    .order('category')
+    .order('key')
+  if (error) throw error
+  return (data as unknown as import('./types').DbEventType[]) || []
+}
+
+// Tipos en n8n_executions que no están en el catálogo (RPC: discover_untracked_event_types)
+export async function fetchUntrackedEventTypes(): Promise<import('./types').UntrackedEventType[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc('discover_untracked_event_types')
+  if (error) throw error
+  return (data as import('./types').UntrackedEventType[]) || []
+}
+
+// Alta de un tipo en el catálogo (clasificar un pendiente). Admin only via RLS.
+export async function classifyEventType(
+  workflowId: string,
+  key: string,
+  category: 'business' | 'system',
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('event_types')
+    .insert({ workflow_id: workflowId, key, category, status: 'active' })
+  if (error) throw error
+}
+
+// Cambia el status de un tipo del catálogo (active/archived). Admin only via RLS.
+export async function setEventTypeStatus(
+  id: string,
+  status: 'active' | 'archived',
+): Promise<void> {
+  const supabase = createClient()
+  const { error } = await supabase
+    .from('event_types')
+    .update({ status })
+    .eq('id', id)
+  if (error) throw error
+}
+
 // Aggregated KPIs for a workflow within an optional date range
 // (RPC: get_workflow_metrics_by_range)
 export async function fetchWorkflowMetricsByRange(

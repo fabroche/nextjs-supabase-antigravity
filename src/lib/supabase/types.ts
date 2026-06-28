@@ -181,14 +181,39 @@ export interface DbCustomMetric {
   instance_id: string | null
   name: string
   slug: string
-  metric_type: 'count' | 'sum' | 'avg' | 'ratio'
+  metric_type: 'count' | 'count_distinct' | 'weighted_sum' | 'ratio' | 'sum_field' | 'sum' | 'avg'
   filter_event_type: string | null
   source_field: string | null
   display_format: string
   icon: string | null
   is_active: boolean
+  config: Record<string, unknown>
   created_at: string
   updated_at: string
+}
+
+// Catálogo gobernado de event_type (migración 019)
+export interface DbEventType {
+  id: string
+  workflow_id: string
+  key: string
+  label: string | null
+  category: 'business' | 'system'
+  status: 'active' | 'pending' | 'archived'
+  is_default: boolean
+  created_at: string
+  updated_at: string
+  n8n_workflows?: { name: string } | null
+}
+
+// Tipo descubierto en n8n_executions que aún no está en el catálogo
+// (RPC discover_untracked_event_types — migración 021)
+export interface UntrackedEventType {
+  workflow_id: string
+  workflow_name: string
+  instance_name: string
+  event_type: string
+  cnt: number
 }
 
 // View: n8n_instance_stats (aggregated per instance, last 30 days)
