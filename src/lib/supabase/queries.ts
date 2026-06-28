@@ -577,6 +577,23 @@ export async function fetchCustomMetricsForWorkflow(
     .select('*')
     .eq('workflow_id', workflowId)
     .eq('is_active', true)
+    .eq('audience', 'client')
+    .order('name')
+  if (error) throw error
+  return data || []
+}
+
+// Métricas internas (Genzai) de un workflow — solo admin (audience='internal')
+export async function fetchInternalMetricsForWorkflow(
+  workflowId: string
+): Promise<import('./types').DbCustomMetric[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase
+    .from('custom_metrics')
+    .select('*')
+    .eq('workflow_id', workflowId)
+    .eq('is_active', true)
+    .eq('audience', 'internal')
     .order('name')
   if (error) throw error
   return data || []

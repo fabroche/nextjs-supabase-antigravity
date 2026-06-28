@@ -40,7 +40,7 @@ export default function WorkflowDetailPage() {
   const params = useParams<{ instanceId: string; workflowId: string }>()
   const { instanceId, workflowId } = params
   const router = useRouter()
-  const { selectedBusiness } = useBusiness()
+  const { selectedBusiness, isAdmin } = useBusiness()
   const chartRef = useRef<HTMLDivElement>(null)
 
   const [instance, setInstance] = useState<DbInstanceStats | null>(null)
@@ -223,6 +223,10 @@ export default function WorkflowDetailPage() {
       />
 
       <CustomMetricCards workflowId={workflowId} dateRange={activeRange} />
+
+      {isAdmin && (
+        <CustomMetricCards workflowId={workflowId} dateRange={activeRange} variant="internal" />
+      )}
 
       <ExecutionTrendChart
         data={trend}

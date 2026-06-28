@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { MetricVisibilitySheet } from "@/components/dashboard/metric-visibility-sheet"
 import { useUiPreferences } from "@/hooks/use-ui-preferences"
-import { fetchCustomMetricsForWorkflow, fetchComputedMetric } from "@/lib/supabase/queries"
+import { fetchCustomMetricsForWorkflow, fetchInternalMetricsForWorkflow, fetchComputedMetric } from "@/lib/supabase/queries"
 import type { DbCustomMetric, DbMetricDefinition } from "@/lib/supabase/types"
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -92,21 +92,26 @@ function CustomMetricCardItem({ metric, dateRange, onHide }: CustomMetricCardIte
 interface CustomMetricCardsProps {
   workflowId: string
   dateRange: { from: Date; to: Date } | null
+  variant?: "client" | "internal"
 }
 
-export function CustomMetricCards({ workflowId, dateRange }: CustomMetricCardsProps) {
+export function CustomMetricCards({ workflowId, dateRange, variant = "client" }: CustomMetricCardsProps) {
   const [metrics, setMetrics] = useState<DbCustomMetric[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { isHidden, getHiddenKeys, toggleMetric, showAll } = useUiPreferences()
 
-  const scopeKey = `custom:workflow:${workflowId}`
+  const isInternal = variant === "internal"
+  const scopeKey = `custom:${variant}:workflow:${workflowId}`
+  const heading = isInternal ? "Métricas internas (Genzai)" : "Métricas de negocio"
 
   useEffect(() => {
-    fetchCustomMetricsForWorkflow(workflowId)
+    const fetchFn = isInternal ? fetchInternalMetricsForWorkflow : fetchCustomMetricsForWorkflow
+    setIsLoading(true)
+    fetchFn(workflowId)
       .then(setMetrics)
       .catch(() => setMetrics([]))
       .finally(() => setIsLoading(false))
-  }, [workflowId])
+  }, [workflowId, isInternal])
 
   if (isLoading) {
     return (
@@ -125,7 +130,7 @@ export function CustomMetricCards({ workflowId, dateRange }: CustomMetricCardsPr
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">Métricas de negocio</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{heading}</h2>
         <MetricVisibilitySheet
           definitions={definitions}
           scopeKey={scopeKey}
