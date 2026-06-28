@@ -202,9 +202,11 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
   const action = actionMap[rawStatus] || 'ejecutó'
 
   // Build description
-  const tokensPrompt = (data.tokens_prompt as number) || 0
-  const tokensCompletion = (data.tokens_completion as number) || 0
-  const costUsd = (data.cost_usd as number) || 0
+  // N8N (Metric Logger) envía los campos numéricos como strings ("2810", "0.001174").
+  // Coercionar con Number() — un cast de TS no convierte en runtime y rompe .toFixed().
+  const tokensPrompt = Number(data.tokens_prompt) || 0
+  const tokensCompletion = Number(data.tokens_completion) || 0
+  const costUsd = Number(data.cost_usd) || 0
   const totalTokens = tokensPrompt + tokensCompletion
 
   let description = `⚡ ${workflowName} ${action}`
@@ -256,9 +258,12 @@ function normalizeN8N(payload: Record<string, unknown>): NormalizedEvent | null 
       tokens_prompt: tokensPrompt || undefined,
       tokens_completion: tokensCompletion || undefined,
       cost_usd: costUsd || undefined,
-      is_out_of_hours: (data.is_out_of_hours as boolean) || undefined,
+      is_out_of_hours:
+        data.is_out_of_hours === undefined || data.is_out_of_hours === null
+          ? undefined
+          : String(data.is_out_of_hours).toLowerCase() === 'true',
       chat_id: (data.chat_id as string) || undefined,
-      duration_ms: (data.duration_ms as number) || undefined,
+      duration_ms: Number(data.duration_ms) || undefined,
       custom: (data.custom as Record<string, unknown>) || undefined,
     },
   }

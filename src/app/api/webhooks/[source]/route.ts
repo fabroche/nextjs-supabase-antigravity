@@ -157,10 +157,11 @@ async function processN8NExecution(
   const rawExecutionId = (event.metadata?.execution_id as string) || ''
   const rawStatus = (event.metadata?.status as string) || 'success'
   const eventType = (event.metadata?.event_type as string) || null
-  const tokensPrompt = (event.metadata?.tokens_prompt as number) || 0
-  const tokensCompletion = (event.metadata?.tokens_completion as number) || 0
-  const costUsd = (event.metadata?.cost_usd as number) || 0
-  const durationMs = (event.metadata?.duration_ms as number) || null
+  // Defensa extra: aunque normalizeN8N ya coerciona, garantizamos números aquí también
+  const tokensPrompt = Number(event.metadata?.tokens_prompt) || 0
+  const tokensCompletion = Number(event.metadata?.tokens_completion) || 0
+  const costUsd = Number(event.metadata?.cost_usd) || 0
+  const durationMs = Number(event.metadata?.duration_ms) || null
   const errorMessage = (event.metadata?.error_message as string) || null
   const errorNode = (event.metadata?.error_node as string) || null
   const modelName = (payload.model_name as string) || null

@@ -185,6 +185,15 @@ inputOverride.ai_languageModel[0][0].json.options.model = "gpt-4.1-mini"
 ```
 **2 niveles de array** (`[0][0]`), no 3. Loop extra rompe la extracción.
 
+### ⚠️ Gotcha: N8N envía números como strings
+
+El Metric Logger arma el `jsonBody` con todos los campos numéricos **entre comillas**
+(`"tokens_prompt": "2810"`, `"cost_usd": "0.001174"`, `"is_out_of_hours": "false"`), por lo
+que llegan como **string**. Un cast de TS (`as number`) NO convierte en runtime → `.toFixed()`
+crasheaba y el webhook caía en `webhook_dead_letters` (218 ejecuciones perdidas, recuperadas
+2026-06-28). `normalizeN8N()` y `processN8NExecution()` ahora fuerzan `Number()` y parseo de
+boolean. Mantener esa coerción defensiva aunque N8N corrija el envío.
+
 ### Escape timer frontend
 
 `useEnrichmentEscape()` en `activity-feed.tsx`: 15s timeout por evento. Si el UPDATE de Realtime nunca llega, el skeleton desaparece solo.
@@ -221,7 +230,12 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
   - PR2: Metric registry + toggle UI personal + admin metrics page — migration 012
   - PR3: PDF report cliente (workflow Level 3) + avatar upload en settings — migration 013
   - ⚠️ Migrations 011–013 y bucket `avatars` pendientes de aplicar en producción
+- ✅ Hotfix coerción numérica webhook N8N (2026-06-28): `Number()`/parseo boolean en
+  `normalizeN8N` + `processN8NExecution`. Recuperadas 218 ejecuciones de dead_letters
+  (fechas originales preservadas). Ver gotcha "N8N envía números como strings".
 - ⏳ Pendiente menor: normalizer Notion (webhooks llegan pero se ignoran)
+- ⏳ En análisis: métricas Agendador Gipsy + catálogo gobernado de event_type (docs en `temporal/`:
+  `validacion-metricas-agendador.md`, `SOP-n8n-metric-logger.md`)
 - ⏳ Sprint 4: por definir
 
 ---
@@ -271,4 +285,4 @@ CREATE POLICY "avatars_user_update" ON storage.objects FOR UPDATE TO authenticat
 
 ---
 
-_Last Updated: 2026-04-18 | Version: 1.1.0_
+_Last Updated: 2026-06-28 | Version: 1.1.0_
