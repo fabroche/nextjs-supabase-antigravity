@@ -36,7 +36,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Allow access to verify-email and auth callback routes without authentication
-  const publicRoutes = ['/login', '/verify-email', '/auth/callback', '/api/webhooks']
+  // /api/webhooks y /api/event-types se autentican con su propio secret (x-n8n-webhook-secret),
+  // no con sesión de usuario — quedan fuera del middleware de auth.
+  const publicRoutes = ['/login', '/verify-email', '/auth/callback', '/api/webhooks', '/api/event-types']
   const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))
 
   // Protected routes - redirect to login if not authenticated

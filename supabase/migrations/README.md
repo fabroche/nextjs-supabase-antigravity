@@ -30,6 +30,7 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 16 | `016_fix_event_count_case_insensitive.sql` | `get_workflow_event_count` con `LOWER()` para matchear `event_type` sin importar capitalización. |
 | 17 | `017_workflow_archived.sql` | `archived_at` en `n8n_workflows` (soft-delete) + RPC `reassign_workflow`. Vista `n8n_workflow_stats` excluye archivados. |
 | 18 | `018_executions_business_fields.sql` | **Sprint 5 PR1** — `chat_id` + `is_out_of_hours` en `n8n_executions` (+ índice parcial) para métricas del agendador (Clientes_Atendidos, FH). Backfill desde `activity_feed.metadata`. Rollback: `rollback_018_executions_business_fields.sql` |
+| 19 | `019_event_type_catalog.sql` | **Sprint 5 PR2** — catálogo gobernado: tablas `event_types` (business/system, is_default) + `event_type_rules` (tool→event_type), RLS admin/dueño, seed del Agente Agendador Gipsy (`cZw0Wjno07VgtmmJ`). Consumido por `GET /api/event-types`. Rollback: `rollback_019_event_type_catalog.sql` |
 
 ---
 
