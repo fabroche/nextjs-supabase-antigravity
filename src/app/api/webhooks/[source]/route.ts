@@ -165,6 +165,9 @@ async function processN8NExecution(
   const errorMessage = (event.metadata?.error_message as string) || null
   const errorNode = (event.metadata?.error_node as string) || null
   const modelName = (payload.model_name as string) || null
+  // Campos de negocio para métricas del agendador (migración 018)
+  const chatId = (event.metadata?.chat_id as string) || null
+  const isOutOfHours = (event.metadata?.is_out_of_hours as boolean | undefined) ?? null
 
   // Map status
   const statusMap: Record<string, string> = {
@@ -192,6 +195,8 @@ async function processN8NExecution(
       duration_ms: durationMs,
       error_message: errorMessage,
       error_node: errorNode,
+      chat_id: chatId,
+      is_out_of_hours: isOutOfHours,
       is_enriched: false,
       metadata: (payload.custom as Record<string, unknown>) || {},
     })

@@ -131,7 +131,7 @@ src/
 | `webhook_dead_letters` | Failed webhooks queue. `resolved BOOLEAN DEFAULT false`. Admin UI en `/admin/dead-letters` |
 | `n8n_instances` | Instancias N8N por negocio. `instance_id` TEXT UNIQUE, `api_base_url`, `api_key` |
 | `n8n_workflows` | Auto-creados al primer webhook. UNIQUE(instance_id, workflow_id) |
-| `n8n_executions` | Core analytics. UNIQUE(instance_id, execution_id). `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `is_enriched` |
+| `n8n_executions` | Core analytics. UNIQUE(instance_id, execution_id). `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `is_enriched`, `chat_id`, `is_out_of_hours` (018) |
 | `model_pricing` | Precios LLM por 1k tokens. Seed: gpt-4o, gpt-4.1, gpt-4.1-mini, claude-sonnet-4... |
 | `custom_metrics` | KPIs configurables por workflow/instancia |
 
@@ -234,7 +234,8 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
   `normalizeN8N` + `processN8NExecution`. Recuperadas 218 ejecuciones de dead_letters
   (fechas originales preservadas). Ver gotcha "N8N envía números como strings".
 - ⏳ Pendiente menor: normalizer Notion (webhooks llegan pero se ignoran)
-- ⏳ En análisis: métricas Agendador Gipsy + catálogo gobernado de event_type (docs en `temporal/`:
+- ⏳ Sprint 5 planificado: métricas Agendador Gipsy + motor configurable + catálogo gobernado de
+  event_type → `SPRINT-5-METRICAS-AGENDADOR-PLAN.md` (diseño en `temporal/`:
   `validacion-metricas-agendador.md`, `SOP-n8n-metric-logger.md`)
 - ⏳ Sprint 4: por definir
 
