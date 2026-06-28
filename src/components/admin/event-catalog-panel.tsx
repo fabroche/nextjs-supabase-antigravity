@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Loader2, Briefcase, Cog, Archive, RotateCcw, EyeOff, Server } from "lucide-react"
+import {
+  Loader2, Briefcase, Cog, Archive, RotateCcw, EyeOff, Server,
+  ChevronDown, ChevronRight,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -20,6 +23,14 @@ export function EventCatalogPanel() {
   const [untracked, setUntracked] = useState<UntrackedEventType[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const toggle = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
 
   const load = useCallback(async () => {
     setIsLoading(true)
@@ -87,6 +98,22 @@ export function EventCatalogPanel() {
     return acc
   }, {})
 
+  function InstanceHeader({ instance, count, open, onClick }: {
+    instance: string; count: number; open: boolean; onClick: () => void
+  }) {
+    return (
+      <button
+        onClick={onClick}
+        className="flex w-full items-center gap-2 text-left text-sm font-semibold hover:text-foreground/80"
+      >
+        {open ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+        <Server className="h-4 w-4 shrink-0 text-muted-foreground" />
+        {instance}
+        <span className="text-xs font-normal text-muted-foreground">({count})</span>
+      </button>
+    )
+  }
+
   return (
     <div className="space-y-8">
       {/* Catálogo actual: instancia → workflow */}
@@ -102,49 +129,51 @@ export function EventCatalogPanel() {
           <p className="text-sm text-muted-foreground py-3">El catálogo está vacío.</p>
         ) : (
           <div className="space-y-5">
-            {Object.entries(catByInstance).map(([inst, workflows]) => (
-              <div key={inst} className="space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Server className="h-4 w-4 text-muted-foreground" />
-                  {inst}
+            {Object.entries(catByInstance).map(([inst, workflows]) => {
+              const key = `cat:${inst}`
+              const open = !collapsed.has(key)
+              const count = Object.values(workflows).reduce((n, arr) => n + arr.length, 0)
+              return (
+                <div key={inst} className="space-y-2">
+                  <InstanceHeader instance={inst} count={count} open={open} onClick={() => toggle(key)} />
+                  {open && Object.entries(workflows).map(([wf, types]) => (
+                    <div key={wf} className="rounded-md border ml-1">
+                      <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
+                        {wf}
+                      </div>
+                      <div className="divide-y">
+                        {types.map((t) => (
+                          <div key={t.id} className="flex items-center justify-between gap-4 px-3 py-2.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`font-mono text-sm ${t.status === "archived" ? "line-through text-muted-foreground" : ""}`}>
+                                {t.key}
+                              </span>
+                              <Badge variant={t.category === "system" ? "secondary" : "outline"} className="text-[10px]">
+                                {t.category}
+                              </Badge>
+                              {t.is_default && <Badge variant="outline" className="text-[10px]">default</Badge>}
+                            </div>
+                            <div className="shrink-0">
+                              {busy === t.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              ) : t.status === "archived" ? (
+                                <Button size="sm" variant="ghost" onClick={() => handleStatus(t, "active")}>
+                                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Restaurar
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="ghost" onClick={() => handleStatus(t, "archived")}>
+                                  <Archive className="mr-1.5 h-3.5 w-3.5" /> Archivar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {Object.entries(workflows).map(([wf, types]) => (
-                  <div key={wf} className="rounded-md border ml-1">
-                    <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
-                      {wf}
-                    </div>
-                    <div className="divide-y">
-                      {types.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between gap-4 px-3 py-2.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`font-mono text-sm ${t.status === "archived" ? "line-through text-muted-foreground" : ""}`}>
-                              {t.key}
-                            </span>
-                            <Badge variant={t.category === "system" ? "secondary" : "outline"} className="text-[10px]">
-                              {t.category}
-                            </Badge>
-                            {t.is_default && <Badge variant="outline" className="text-[10px]">default</Badge>}
-                          </div>
-                          <div className="shrink-0">
-                            {busy === t.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            ) : t.status === "archived" ? (
-                              <Button size="sm" variant="ghost" onClick={() => handleStatus(t, "active")}>
-                                <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Restaurar
-                              </Button>
-                            ) : (
-                              <Button size="sm" variant="ghost" onClick={() => handleStatus(t, "archived")}>
-                                <Archive className="mr-1.5 h-3.5 w-3.5" /> Archivar
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
@@ -164,46 +193,49 @@ export function EventCatalogPanel() {
           </p>
         ) : (
           <div className="space-y-5">
-            {Object.entries(untByInstance).map(([inst, items]) => (
-              <div key={inst} className="space-y-2">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  <Server className="h-4 w-4 text-muted-foreground" />
-                  {inst}
+            {Object.entries(untByInstance).map(([inst, items]) => {
+              const key = `unt:${inst}`
+              const open = !collapsed.has(key)
+              return (
+                <div key={inst} className="space-y-2">
+                  <InstanceHeader instance={inst} count={items.length} open={open} onClick={() => toggle(key)} />
+                  {open && (
+                    <div className="divide-y rounded-md border ml-1">
+                      {items.map((u) => {
+                        const k = `${u.workflow_id}:${u.event_type}`
+                        return (
+                          <div key={k} className="flex items-center justify-between gap-4 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <span className="font-mono text-sm">{u.event_type}</span>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {u.workflow_name} · {u.cnt} ejecuciones
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {busy === k ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              ) : (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => handleClassify(u, "business")}>
+                                    <Briefcase className="mr-1.5 h-3.5 w-3.5" /> Negocio
+                                  </Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleClassify(u, "system")}>
+                                    <Cog className="mr-1.5 h-3.5 w-3.5" /> Sistema
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleClassify(u, "business", "archived")}>
+                                    <EyeOff className="mr-1.5 h-3.5 w-3.5" /> Ignorar
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="divide-y rounded-md border ml-1">
-                  {items.map((u) => {
-                    const k = `${u.workflow_id}:${u.event_type}`
-                    return (
-                      <div key={k} className="flex items-center justify-between gap-4 px-3 py-2.5">
-                        <div className="min-w-0">
-                          <span className="font-mono text-sm">{u.event_type}</span>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {u.workflow_name} · {u.cnt} ejecuciones
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {busy === k ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          ) : (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => handleClassify(u, "business")}>
-                                <Briefcase className="mr-1.5 h-3.5 w-3.5" /> Negocio
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleClassify(u, "system")}>
-                                <Cog className="mr-1.5 h-3.5 w-3.5" /> Sistema
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleClassify(u, "business", "archived")}>
-                                <EyeOff className="mr-1.5 h-3.5 w-3.5" /> Ignorar
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
