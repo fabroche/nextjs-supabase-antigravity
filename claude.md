@@ -54,6 +54,9 @@ src/
     admin/
       dead-letters/
         page.tsx             # Tabla dead letters + "Resolver" — solo admin (useBusiness().isAdmin)
+      metrics/
+        page.tsx             # Tabs: Generales (preset) | Custom | Catálogo (event_types)
+                             # Catálogo: EventCatalogPanel — clasifica tipos sin clasificar (021)
   lib/
     n8n/
       enrichment.ts          # fetchN8NExecutionDetail() — polling hasta finished=true
@@ -141,7 +144,7 @@ src/
 | `event_type_rules` | Mapeo `tool_pattern → event_type_key` por workflow (Opción B). Migración 019 |
 
 **Vistas**: `business_metrics`, `n8n_instance_stats`, `n8n_workflow_stats`  
-**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`, `compute_metric(metric_id, p_from?, p_to?)` (motor configurable: count/count_distinct/weighted_sum/ratio/sum_field — migración 020), `metric_build_where(...)` helper  
+**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`, `compute_metric(metric_id, p_from?, p_to?)` (motor configurable: count/count_distinct/weighted_sum/ratio/sum_field — migración 020), `metric_build_where(...)` helper, `discover_untracked_event_types()` (auto-descubrimiento de event_type fuera del catálogo — migración 021)  
 **Context hook**: `useBusiness()` (NO `useBusinessContext`) — exportado desde `contexts/business-context.tsx`
 
 **RLS pattern**: admin via `is_admin()` (SECURITY DEFINER). Negocio via cadena `owner_id = auth.uid()` o join a `businesses`.  

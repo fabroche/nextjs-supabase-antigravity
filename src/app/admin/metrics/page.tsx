@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { RefreshCw } from "lucide-react"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { MetricsTable } from "@/components/admin/metrics-table"
+import { EventCatalogPanel } from "@/components/admin/event-catalog-panel"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -75,6 +76,7 @@ export default function AdminMetricsPage() {
         <TabsList>
           <TabsTrigger value="generales">Generales</TabsTrigger>
           <TabsTrigger value="custom">Custom</TabsTrigger>
+          <TabsTrigger value="catalogo">Catálogo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="generales" className="mt-4">
@@ -142,6 +144,21 @@ export default function AdminMetricsPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="catalogo" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Catálogo de event_type</CardTitle>
+              <CardDescription>
+                Vocabulario controlado por workflow. Clasifica los tipos sin clasificar y
+                gestiona el catálogo. N8N lo consume vía <code>GET /api/event-types</code>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EventCatalogPanel />
             </CardContent>
           </Card>
         </TabsContent>
