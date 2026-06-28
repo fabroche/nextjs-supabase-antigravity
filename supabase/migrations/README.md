@@ -26,6 +26,10 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 12 | `012_metric_registry_and_ui_prefs.sql` | Creates `metric_definitions` table (12 seed rows: 4 keys × 3 scopes) + `ui_preferences JSONB` on `user_profiles` for per-user metric visibility. RLS: users own their prefs; admin can manage definitions. |
 | 13 | `013_user_profiles_avatar.sql` | Adds `avatar_url TEXT` to `user_profiles` for Supabase Storage avatar uploads. |
 | 14 | `014_custom_metrics_agendador.sql` | 4 RPCs de métricas de dominio por `event_type` (Mensaje_Respondido, Cita_Confirmada, Cancelacion, Consulta_Disponibilidad) + registros en `custom_metrics` para el workflow Agente Agendador. |
+| 15 | `015_custom_metrics_is_active.sql` | Añade `is_active BOOLEAN` a `custom_metrics` (toggle de visibilidad). Rollback incluido. |
+| 16 | `016_fix_event_count_case_insensitive.sql` | `get_workflow_event_count` con `LOWER()` para matchear `event_type` sin importar capitalización. |
+| 17 | `017_workflow_archived.sql` | `archived_at` en `n8n_workflows` (soft-delete) + RPC `reassign_workflow`. Vista `n8n_workflow_stats` excluye archivados. |
+| 18 | `018_executions_business_fields.sql` | **Sprint 5 PR1** — `chat_id` + `is_out_of_hours` en `n8n_executions` (+ índice parcial) para métricas del agendador (Clientes_Atendidos, FH). Backfill desde `activity_feed.metadata`. Rollback: `rollback_018_executions_business_fields.sql` |
 
 ---
 
