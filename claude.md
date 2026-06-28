@@ -46,6 +46,9 @@ src/
         validators.ts        # HMAC para Dokploy/Notion; comparación directa para Telegram/N8N
         normalizers.ts       # normalizeN8N(), normalizeTelegram() — construyen NormalizedEvent
                              # ⚠️ Notion: case comentado, normalizer pendiente
+    api/event-types/
+      route.ts               # GET catálogo gobernado (event_types+rules+default) para N8N
+                             # auth x-n8n-webhook-secret; params instance_id + workflow_id (019)
     settings/
       page.tsx               # Form para vincular telegram_id + notion_person_id al perfil
     admin/
@@ -134,6 +137,8 @@ src/
 | `n8n_executions` | Core analytics. UNIQUE(instance_id, execution_id). `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `is_enriched`, `chat_id`, `is_out_of_hours` (018) |
 | `model_pricing` | Precios LLM por 1k tokens. Seed: gpt-4o, gpt-4.1, gpt-4.1-mini, claude-sonnet-4... |
 | `custom_metrics` | KPIs configurables por workflow/instancia |
+| `event_types` | Catálogo gobernado de event_type por workflow (`business`/`system`, `is_default`, `status`). Migración 019 |
+| `event_type_rules` | Mapeo `tool_pattern → event_type_key` por workflow (Opción B). Migración 019 |
 
 **Vistas**: `business_metrics`, `n8n_instance_stats`, `n8n_workflow_stats`  
 **RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`  
