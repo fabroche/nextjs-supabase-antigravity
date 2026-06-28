@@ -141,7 +141,7 @@ src/
 | `event_type_rules` | Mapeo `tool_pattern → event_type_key` por workflow (Opción B). Migración 019 |
 
 **Vistas**: `business_metrics`, `n8n_instance_stats`, `n8n_workflow_stats`  
-**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`  
+**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`, `compute_metric(metric_id, p_from?, p_to?)` (motor configurable: count/count_distinct/weighted_sum/ratio/sum_field — migración 020), `metric_build_where(...)` helper  
 **Context hook**: `useBusiness()` (NO `useBusinessContext`) — exportado desde `contexts/business-context.tsx`
 
 **RLS pattern**: admin via `is_admin()` (SECURITY DEFINER). Negocio via cadena `owner_id = auth.uid()` o join a `businesses`.  

@@ -600,6 +600,23 @@ export async function fetchWorkflowEventCount(
   return Number(data) || 0
 }
 
+// Compute a configurable custom metric over an optional date range (RPC: compute_metric).
+// Motor genérico: count / count_distinct / weighted_sum / ratio / sum_field (migración 020).
+export async function fetchComputedMetric(
+  metricId: string,
+  from?: Date,
+  to?: Date,
+): Promise<number> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc('compute_metric', {
+    p_metric_id: metricId,
+    p_from: from?.toISOString() ?? null,
+    p_to:   to?.toISOString()   ?? null,
+  })
+  if (error) throw error
+  return Number(data) || 0
+}
+
 // Toggle is_active on a custom metric (admin only)
 export async function toggleCustomMetricActive(id: string, isActive: boolean): Promise<void> {
   const supabase = createClient()
