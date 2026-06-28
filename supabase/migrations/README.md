@@ -33,6 +33,7 @@ This directory contains SQL migration files for the Supabase (PostgreSQL) databa
 | 19 | `019_event_type_catalog.sql` | **Sprint 5 PR2** — catálogo gobernado: tablas `event_types` (business/system, is_default) + `event_type_rules` (tool→event_type), RLS admin/dueño, seed del Agente Agendador Gipsy (`cZw0Wjno07VgtmmJ`). Consumido por `GET /api/event-types`. Rollback: `rollback_019_event_type_catalog.sql` |
 | 20 | `020_metric_engine.sql` | **Sprint 5 PR3** — motor de métricas configurable: `metric_type` ampliado + `config JSONB` en `custom_metrics`, RPC `compute_metric` (count/count_distinct/weighted_sum/ratio/sum_field) + helper `metric_build_where`. Borra funciones/seeds de la 014, reseed de 7 métricas Gipsy al workflow correcto. Rollback: `rollback_020_metric_engine.sql` |
 | 21 | `021_discover_untracked_event_types.sql` | **Sprint 5 PR4** — RPC `discover_untracked_event_types()`: event_type en `n8n_executions` ausentes del catálogo (auto-descubrimiento para el panel admin). Rollback: `rollback_021_discover_untracked_event_types.sql` |
+| 22 | `022_internal_metrics.sql` | **Sprint 5 PR5** — métricas internas Genzai: columna `audience` (client/internal) en `custom_metrics`, motor generalizado (ratio sum/count + `as_percent`, sum multi-campo, filtro `status`) + helper `metric_agg`, seed de 6 métricas internas del agendador. Rollback: `rollback_022_internal_metrics.sql` |
 
 ---
 

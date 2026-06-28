@@ -188,6 +188,7 @@ export interface DbCustomMetric {
   icon: string | null
   is_active: boolean
   config: Record<string, unknown>
+  audience: 'client' | 'internal'
   created_at: string
   updated_at: string
 }

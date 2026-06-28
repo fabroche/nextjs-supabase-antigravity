@@ -139,12 +139,12 @@ src/
 | `n8n_workflows` | Auto-creados al primer webhook. UNIQUE(instance_id, workflow_id) |
 | `n8n_executions` | Core analytics. UNIQUE(instance_id, execution_id). `tokens_prompt`, `tokens_completion`, `model_name`, `cost_usd`, `is_enriched`, `chat_id`, `is_out_of_hours` (018) |
 | `model_pricing` | Precios LLM por 1k tokens. Seed: gpt-4o, gpt-4.1, gpt-4.1-mini, claude-sonnet-4... |
-| `custom_metrics` | KPIs configurables por workflow/instancia |
+| `custom_metrics` | KPIs configurables por workflow/instancia. `metric_type`+`config JSONB` (020), `audience` client/internal (022) |
 | `event_types` | Catálogo gobernado de event_type por workflow (`business`/`system`, `is_default`, `status`). Migración 019 |
 | `event_type_rules` | Mapeo `tool_pattern → event_type_key` por workflow (Opción B). Migración 019 |
 
 **Vistas**: `business_metrics`, `n8n_instance_stats`, `n8n_workflow_stats`  
-**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`, `compute_metric(metric_id, p_from?, p_to?)` (motor configurable: count/count_distinct/weighted_sum/ratio/sum_field — migración 020), `metric_build_where(...)` helper, `discover_untracked_event_types()` (auto-descubrimiento de event_type fuera del catálogo — migración 021)  
+**RPCs**: `get_user_role()`, `get_monthly_chart_data(business_id, months)`, `get_execution_trend(instance_id?, workflow_id?, days?, p_from?, p_to?)`, `get_workflow_metrics_by_range(workflow_id, p_from?, p_to?)`, `compute_metric(metric_id, p_from?, p_to?)` (motor configurable: count/count_distinct/weighted_sum/ratio/sum_field — migración 020, generalizado en 022: ratio sum/count + as_percent, sum multi-campo, filtro status), `metric_build_where(...)` + `metric_agg(...)` helpers, `discover_untracked_event_types()` (auto-descubrimiento — migración 021)  
 **Context hook**: `useBusiness()` (NO `useBusinessContext`) — exportado desde `contexts/business-context.tsx`
 
 **RLS pattern**: admin via `is_admin()` (SECURITY DEFINER). Negocio via cadena `owner_id = auth.uid()` o join a `businesses`.  
