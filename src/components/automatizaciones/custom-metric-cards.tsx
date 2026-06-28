@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { MetricCard } from "@/components/dashboard/metric-card"
 import { MetricVisibilitySheet } from "@/components/dashboard/metric-visibility-sheet"
 import { useUiPreferences } from "@/hooks/use-ui-preferences"
-import { fetchCustomMetricsForWorkflow, fetchWorkflowEventCount } from "@/lib/supabase/queries"
+import { fetchCustomMetricsForWorkflow, fetchComputedMetric } from "@/lib/supabase/queries"
 import type { DbCustomMetric, DbMetricDefinition } from "@/lib/supabase/types"
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -51,23 +51,17 @@ interface CustomMetricCardItemProps {
   onHide: () => void
 }
 
-function CustomMetricCardItem({ metric, workflowId, dateRange, onHide }: CustomMetricCardItemProps) {
+function CustomMetricCardItem({ metric, dateRange, onHide }: CustomMetricCardItemProps) {
   const [value, setValue] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!metric.filter_event_type) { setIsLoading(false); return }
     setIsLoading(true)
-    fetchWorkflowEventCount(
-      workflowId,
-      metric.filter_event_type,
-      dateRange?.from,
-      dateRange?.to,
-    )
+    fetchComputedMetric(metric.id, dateRange?.from, dateRange?.to)
       .then(setValue)
       .catch(() => setValue(0))
       .finally(() => setIsLoading(false))
-  }, [workflowId, metric.filter_event_type, dateRange])
+  }, [metric.id, dateRange])
 
   const Icon = (metric.icon ? ICON_MAP[metric.icon] : null) ?? BarChart2
 
