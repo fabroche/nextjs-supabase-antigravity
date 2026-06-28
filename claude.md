@@ -242,6 +242,8 @@ Colaborador N8N trabajando en Code node que inyecta `tokens_prompt`/`tokens_comp
   `normalizeN8N` + `processN8NExecution`. Recuperadas 218 ejecuciones de dead_letters
   (fechas originales preservadas). Ver gotcha "N8N envía números como strings".
 - ⏳ Pendiente menor: normalizer Notion (webhooks llegan pero se ignoran)
+- 💡 Idea a debatir (tras Sprint 5): endpoints que devuelvan su propia doc en `.md` lista para
+  consumo por LLMs (ej. `?format=md` / `Accept: text/markdown`). Empezar por endpoints N8N.
 - ⏳ Sprint 5 planificado: métricas Agendador Gipsy + motor configurable + catálogo gobernado de
   event_type → `SPRINT-5-METRICAS-AGENDADOR-PLAN.md` (diseño en `temporal/`:
   `validacion-metricas-agendador.md`, `SOP-n8n-metric-logger.md`)
